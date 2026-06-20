@@ -4,6 +4,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { GraduationCap, ShieldCheck } from 'lucide-react';
 import { Button, Input, Card, CardBody } from '@/shared/components';
 
+const DEMO_ACCOUNTS = [
+  { username: 'admin', password: 'admin123', label: 'Quản trị hệ thống', quyen: 'ADMIN' },
+  { username: 'nhaphoso', password: 'admin123', label: 'Tổ Nhập Hồ Sơ', quyen: 'TO_NHAP_HOSO' },
+  { username: 'nhapdiem', password: 'admin123', label: 'Tổ Nhập Điểm', quyen: 'TO_NHAP_DIEM' },
+  { username: 'lanhdao', password: 'admin123', label: 'Lãnh đạo Sở', quyen: 'LANH_DAO' }
+];
+
 function LoginForm() {
   const router = useRouter();
   const search = useSearchParams();
@@ -122,15 +129,22 @@ function LoginForm() {
           </Card>
 
           <div className="mt-6 rounded-lg border border-slate-200/80 bg-white p-4 text-xs text-slate-600">
-            <p className="font-medium text-slate-700">Tài khoản mặc định</p>
-            <p className="mt-1.5">
-              Tên đăng nhập:{' '}
-              <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-800">admin</code>
-              {' · '}
-              Mật khẩu:{' '}
-              <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-800">admin123</code>
-            </p>
-            <p className="mt-2 text-slate-500">Vui lòng đổi mật khẩu ngay sau lần đăng nhập đầu tiên.</p>
+            <p className="font-medium text-slate-700">Tài khoản demo (bấm để điền nhanh)</p>
+            <p className="mt-1 text-slate-500">Mật khẩu chung: <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-800">admin123</code></p>
+            <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+              {DEMO_ACCOUNTS.map(acc => (
+                <button
+                  key={acc.username}
+                  type="button"
+                  onClick={() => { setUsername(acc.username); setPassword(acc.password); }}
+                  className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-left text-[11px] transition hover:border-brand-300 hover:bg-brand-50"
+                >
+                  <div className="font-mono text-slate-800">{acc.username}</div>
+                  <div className="text-slate-500">{acc.label}</div>
+                </button>
+              ))}
+            </div>
+            <p className="mt-2.5 text-slate-500">Vui lòng đổi mật khẩu ngay sau lần đăng nhập đầu tiên.</p>
           </div>
         </div>
       </main>
