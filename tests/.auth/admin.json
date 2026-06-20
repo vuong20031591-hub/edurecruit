@@ -1,0 +1,15 @@
+{
+  "cookies": [
+    {
+      "name": "edurecruit_session",
+      "value": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMyIsInVzZXJuYW1lIjoiYWRtaW4iLCJxdXllbiI6IkFETUlOIiwiaG9fdGVuIjoiUXXhuqNuIHRy4buLIGjhu4cgdGjhu5FuZyIsImlhdCI6MTc4MTg5MDA3MSwiZXhwIjoxNzgxOTE4ODcxLCJpc3MiOiJlZHVyZWNydWl0In0.sexrZpPqPWKcSrKYyjQMaGIh0dYlwdWdA99W202a0vk",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1781918871.329374,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
+}

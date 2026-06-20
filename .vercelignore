@@ -1,0 +1,45 @@
+# Node
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Production
+*.tsbuildinfo
+next-env.d.ts
+compact
+
+# Data (Chỉ ignore backups, cho phép upload database và templates)
+data/backups/
+logs/
+
+# Environment
+.env
+.env*.local
+!.env.local.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+playwright-report/
+test-results/
+
+# Temp
+*.tmp
+*.bak
+
+.vercel
