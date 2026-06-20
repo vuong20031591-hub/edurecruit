@@ -6,38 +6,39 @@
 import Database from 'better-sqlite3-multiple-ciphers';
 import path from 'node:path';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 
 let _db: Database.Database | null = null;
+
+function sha256File(filePath: string): string | null {
+  try {
+    const buf = fs.readFileSync(filePath);
+    return crypto.createHash('sha256').update(buf).digest('hex');
+  } catch {
+    return null;
+  }
+}
 
 function resolveDbPath(): string {
   if (process.env.VERCEL) {
     const tmpDbPath = '/tmp/edurecruit.db';
+    const tmpHashPath = '/tmp/.edurecruit.db.sha256';
     const bundledDbPath = path.resolve(process.cwd(), 'data', 'edurecruit.db');
     if (fs.existsSync(bundledDbPath)) {
-      let shouldCopy = false;
-      if (!fs.existsSync(tmpDbPath)) {
-        shouldCopy = true;
-      } else {
-        try {
-          const bundledStat = fs.statSync(bundledDbPath);
-          const tmpStat = fs.statSync(tmpDbPath);
-          // Ghi đè nếu file bundle mới có size khác hoặc thời gian sửa đổi mới hơn
-          if (bundledStat.size !== tmpStat.size || bundledStat.mtimeMs > tmpStat.mtimeMs) {
-            shouldCopy = true;
-          }
-        } catch {
-          shouldCopy = true;
-        }
-      }
+      const bundledHash = sha256File(bundledDbPath);
+      const tmpHash = fs.existsSync(tmpHashPath)
+        ? fs.readFileSync(tmpHashPath, 'utf8').trim()
+        : null;
+      const shouldCopy = bundledHash && (bundledHash !== tmpHash || !fs.existsSync(tmpDbPath));
 
       if (shouldCopy) {
         try {
-          // Xóa file cũ trước khi copy để tránh lỗi busy/lock
           if (fs.existsSync(tmpDbPath)) {
             fs.unlinkSync(tmpDbPath);
           }
           fs.copyFileSync(bundledDbPath, tmpDbPath);
-          console.log('Successfully updated SQLite DB in /tmp with new deployment bundle');
+          if (bundledHash) fs.writeFileSync(tmpHashPath, bundledHash);
+          console.log('Updated SQLite DB in /tmp from deployment bundle');
         } catch (err) {
           console.error('Failed to copy SQLite DB to /tmp:', err);
         }
