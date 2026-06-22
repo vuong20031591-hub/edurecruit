@@ -241,13 +241,15 @@ export default function UsersPage() {
         title="Quản lý tài khoản"
         description="Thêm, sửa, xóa tài khoản người dùng hệ thống"
         actions={
-          <Button size="sm" leftIcon={<Plus size={14} />} onClick={openCreate}>
-            Thêm tài khoản
-          </Button>
+          <span data-guide="users-create">
+            <Button size="sm" leftIcon={<Plus size={14} />} onClick={openCreate}>
+              Thêm tài khoản
+            </Button>
+          </span>
         }
       />
 
-      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+      <div data-guide="users-list" className="rounded-xl border border-slate-200 bg-white overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-16"><Spinner /></div>
         ) : users.length === 0 ? (

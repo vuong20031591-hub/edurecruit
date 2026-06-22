@@ -139,7 +139,7 @@ export function Sidebar({ quyen }: SidebarProps) {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className={cn(
+      <aside data-guide="sidebar" className={cn(
         "hidden shrink-0 flex-col border-r border-white/5 bg-slate-900 text-slate-200 md:flex transition-all duration-300",
         collapsed ? "w-16" : "w-56"
       )}>

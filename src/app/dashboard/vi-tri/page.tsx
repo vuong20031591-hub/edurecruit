@@ -146,7 +146,7 @@ export default function ViTriPage() {
           </div>
         )}
 
-        <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-3">
+        <div data-guide="vi-tri-create" className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-3">
           <Button onClick={openCreate} disabled={!kyId}>
             <Plus size={16} />
             Thêm vị trí
@@ -186,7 +186,7 @@ export default function ViTriPage() {
           </Button>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white">
+        <div data-guide="vi-tri-list" className="rounded-lg border border-slate-200 bg-white">
           {loading && data.data.length === 0 ? (
             <div className="flex h-48 items-center justify-center">
               <Spinner size={24} className="text-brand-500" />

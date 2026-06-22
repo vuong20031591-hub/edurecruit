@@ -46,9 +46,9 @@ const CONFIG_KEYS = [
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 
-function Section({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) {
+function Section({ icon: Icon, title, children, dataGuide }: { icon: React.ElementType; title: string; children: React.ReactNode; dataGuide?: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+    <div data-guide={dataGuide} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
       <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50 px-5 py-3.5">
         <Icon size={16} className="text-slate-500" />
         <h3 className="text-base font-semibold text-slate-700">{title}</h3>
@@ -308,7 +308,7 @@ export default function CaiDatSystemPage() {
       )}
 
       {/* ── Section 1: Thông tin kỳ tuyển dụng ────────────────────────── */}
-      <Section icon={Calendar} title="Thông tin kỳ tuyển dụng">
+      <Section icon={Calendar} title="Thông tin kỳ tuyển dụng" dataGuide="cai-dat-ky">
         {!ky ? (
           <p className="text-sm text-slate-400">Chưa có kỳ tuyển dụng nào. Vui lòng tạo kỳ trước.</p>
         ) : (
@@ -397,7 +397,7 @@ export default function CaiDatSystemPage() {
       </Section>
 
       {/* ── Section 2: Bảo mật & phân quyền ───────────────────────────── */}
-      <Section icon={Shield} title="Bảo mật & phân quyền">
+      <Section icon={Shield} title="Bảo mật & phân quyền" dataGuide="cai-dat-users-section">
         {users.length === 0 ? (
           <p className="text-sm text-slate-400">Chưa có tài khoản nào</p>
         ) : (
@@ -450,7 +450,7 @@ export default function CaiDatSystemPage() {
       </Section>
 
       {/* ── Section 3: Thông báo & cảnh báo ────────────────────────────── */}
-      <Section icon={Bell} title="Thông báo & cảnh báo">
+      <Section icon={Bell} title="Thông báo & cảnh báo" dataGuide="cai-dat-thong-bao">
         <div className="flex flex-col gap-4">
           <CheckItem
             label={`Cảnh báo khi chênh lệch điểm > ${config['canh_bao_chenh_lech'] ?? '1.5'}`}
@@ -474,7 +474,7 @@ export default function CaiDatSystemPage() {
       </Section>
 
       {/* ── Section 4: Dữ liệu & sao lưu ───────────────────────────────── */}
-      <Section icon={Database} title="Dữ liệu & sao lưu">
+      <Section icon={Database} title="Dữ liệu & sao lưu" dataGuide="cai-dat-backup-section">
         <div className="flex flex-col gap-3">
           {/* Auto backup toggle */}
           <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-3">

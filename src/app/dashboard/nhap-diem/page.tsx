@@ -399,15 +399,17 @@ export default function NhapDiemPage() {
 
         {/* Khóa điểm — chỉ ADMIN và LANH_DAO */}
         {canKhoa && (!khoaConfirm ? (
-          <Button
-            variant="danger"
-            size="sm"
-            leftIcon={<Lock size={14} />}
-            onClick={() => setKhoaConfirm(true)}
-            disabled={!selectedPhongId || isAllLocked || stats.tongThiSinh === 0}
-          >
-            {isAllLocked ? 'Đã khóa' : 'Khóa điểm'}
-          </Button>
+          <span data-guide="nhap-diem-khoa">
+            <Button
+              variant="danger"
+              size="sm"
+              leftIcon={<Lock size={14} />}
+              onClick={() => setKhoaConfirm(true)}
+              disabled={!selectedPhongId || isAllLocked || stats.tongThiSinh === 0}
+            >
+              {isAllLocked ? 'Đã khóa' : 'Khóa điểm'}
+            </Button>
+          </span>
         ) : (
           <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5">
             <AlertTriangle size={14} className="text-red-600" />
@@ -424,7 +426,7 @@ export default function NhapDiemPage() {
       </div>
 
       {/* ── Fast Focus Banner ───────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+      <div data-guide="nhap-diem-search" className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
         <Search size={18} className="text-blue-500 shrink-0" />
         <input
           ref={searchRef}
@@ -447,7 +449,7 @@ export default function NhapDiemPage() {
       </div>
 
       {/* ── Table ───────────────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+      <div data-guide="nhap-diem-grid" className="rounded-xl border border-slate-200 bg-white overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Spinner />

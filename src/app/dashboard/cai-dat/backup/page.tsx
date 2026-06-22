@@ -89,13 +89,15 @@ export default function BackupPage() {
         title="Sao lưu & Phục hồi"
         description="Quản lý bản sao lưu cơ sở dữ liệu"
         actions={
-          <Button
-            onClick={handleCreate}
-            loading={creating}
-            leftIcon={<DatabaseBackup size={16} />}
-          >
-            Sao lưu ngay
-          </Button>
+          <span data-guide="backup-create">
+            <Button
+              onClick={handleCreate}
+              loading={creating}
+              leftIcon={<DatabaseBackup size={16} />}
+            >
+              Sao lưu ngay
+            </Button>
+          </span>
         }
       />
 
@@ -104,7 +106,7 @@ export default function BackupPage() {
           ⚠️ Lưu ý: Sau khi phục hồi, trang sẽ tự tải lại. Mọi thay đổi chưa lưu sẽ bị mất.
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white">
+        <div data-guide="backup-list" className="rounded-xl border border-slate-200 bg-white">
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <Spinner />

@@ -327,7 +327,7 @@ export default function BaoCaoPage() {
 
           {/* Row 3: Tài liệu xuất */}
           {canXuat && (
-          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+          <div data-guide="bao-cao-xuat" className="rounded-xl border border-slate-200 bg-white overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100">

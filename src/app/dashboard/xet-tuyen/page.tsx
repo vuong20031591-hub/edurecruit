@@ -113,17 +113,19 @@ export default function XetTuyenPage() {
       )}
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
-        <Button
-          variant="danger"
-          size="sm"
-          leftIcon={<Play size={14} />}
-          onClick={() => setConfirmOpen(true)}
-          disabled={!preCheck?.ready || running}
-          loading={running}
-        >
-          Chạy xét tuyển
-        </Button>
+      <div data-guide="xet-tuyen-tinh" className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+        <span data-guide="xet-tuyen-chay">
+          <Button
+            variant="danger"
+            size="sm"
+            leftIcon={<Play size={14} />}
+            onClick={() => setConfirmOpen(true)}
+            disabled={!preCheck?.ready || running}
+            loading={running}
+          >
+            Chạy xét tuyển
+          </Button>
+        </span>
 
         <div className="h-6 w-px bg-slate-200" />
 

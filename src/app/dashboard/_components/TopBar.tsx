@@ -5,6 +5,7 @@ import { initials } from '@/shared/lib/format';
 import { QuyenLabel } from '@/shared/constants/enums';
 import type { Quyen } from '@/db/schema';
 import { useTopbar } from '@/shared/hooks/useTopbar';
+import { GuideLauncher } from '@/shared/components/Guide';
 
 interface TopBarProps {
   session: { ho_ten: string; quyen: Quyen; username: string };
@@ -67,6 +68,9 @@ export function TopBar({ session }: TopBarProps) {
           </span>
         )}
       </button>
+
+      {/* Guide launcher */}
+      <GuideLauncher />
 
       {/* User avatar + name */}
       <div className="relative">

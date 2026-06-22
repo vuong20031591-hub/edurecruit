@@ -468,14 +468,16 @@ export default function HoSoListPage() {
               </Button>
             )}
             {canCreate && (
-              <Button
-                variant="outline"
-                size="sm"
-                leftIcon={<Upload size={14} />}
-                onClick={() => router.push('/dashboard/ho-so/import')}
-              >
-                Import Excel
-              </Button>
+              <span data-guide="ho-so-import">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Upload size={14} />}
+                  onClick={() => router.push('/dashboard/ho-so/import')}
+                >
+                  Import Excel
+                </Button>
+              </span>
             )}
             {canExport && (
               <Button
@@ -526,7 +528,7 @@ export default function HoSoListPage() {
           </div>
 
           {/* Hàng 2: FilterBar (search + dropdowns) */}
-          <div className="mt-3">
+          <div data-guide="ho-so-filter" className="mt-3">
             <FilterBar
               filter={filter}
               onChange={handleFilterChange}
@@ -569,7 +571,7 @@ export default function HoSoListPage() {
               }
             />
           ) : (
-            <>
+            <div data-guide="ho-so-list">
               <ThiSinhTable
                 data={data.data as ThiSinhView[]}
                 page={data.page}
@@ -586,7 +588,7 @@ export default function HoSoListPage() {
                 onPageChange={handlePageChange}
                 onPageSizeChange={handlePageSizeChange}
               />
-            </>
+            </div>
           )}
         </div>
       </div>

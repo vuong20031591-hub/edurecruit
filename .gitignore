@@ -14,13 +14,13 @@ dist/
 next-env.d.ts
 compact
 
-# Data (commit DB bundle, ignore backups, templates, WAL files)
-data/
-!data/edurecruit.db
+# Data — commit DB bundle, ignore backups, templates, WAL files
 data/backups/
 data/templates/
 data/*.db-wal
 data/*.db-shm
+# Allow DB bundle to be tracked
+!data/edurecruit.db
 logs/
 
 # Environment

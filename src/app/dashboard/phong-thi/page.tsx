@@ -219,7 +219,7 @@ export default function PhongThiPage() {
         </div>
 
         {/* ─── Toolbar (Figma: sapxep button + in + status + toggle) ─── */}
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div data-guide="phong-thi-sap-xep" className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
           {/* Xếp phòng tự động */}
           <Button
             variant="primary"
@@ -306,7 +306,7 @@ export default function PhongThiPage() {
         )}
 
         {/* ─── Table/Grid content ─── */}
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div data-guide="phong-thi-list" className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
           {loading && !hasData ? (
             <div className="flex h-48 items-center justify-center">
               <Spinner size={24} className="text-brand-500" />

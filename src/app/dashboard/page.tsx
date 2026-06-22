@@ -39,7 +39,7 @@ export default function DashboardOverviewPage() {
             <Spinner size={24} className="text-brand-500" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div data-guide="tongquan-kpi" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               label="Tổng số hồ sơ"
               value={stats.tongSoHoSo.toLocaleString('vi-VN')}
@@ -80,7 +80,7 @@ export default function DashboardOverviewPage() {
         )}
 
         {/* Charts */}
-        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div data-guide="tongquan-charts" className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           <div className="lg:col-span-2">
             {progressChart.length > 0
               ? <ProgressChart data={progressChart} year={ky ? String(ky.nam) : '2026'} />
@@ -94,7 +94,7 @@ export default function DashboardOverviewPage() {
         </div>
 
         {/* Activity log */}
-        <div className="mt-5">
+        <div data-guide="tongquan-activity" className="mt-5">
           <ActivityCard />
         </div>
       </div>
