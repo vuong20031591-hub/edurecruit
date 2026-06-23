@@ -16,7 +16,7 @@ export function TopBar({ session }: TopBarProps) {
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   return (
-    <header className="flex h-13 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-5 md:px-5 pl-14 md:pl-5">
+    <header className="no-print flex h-13 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-5 md:px-5 pl-14 md:pl-5">
       {/* Status pill: tên kỳ hiện tại */}
       <div className="flex items-center gap-2 min-w-0">
         <span className={`h-2 w-2 shrink-0 rounded-full ${data.ky?.trang_thai === 'DangTuyen' ? 'bg-status-success' : 'bg-slate-400'}`} />

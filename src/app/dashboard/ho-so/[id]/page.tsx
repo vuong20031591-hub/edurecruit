@@ -388,6 +388,7 @@ export default function HoSoDetailPage({ params }: { params: Promise<{ id: strin
                 canRasoat={canRasoat}
                 onUpdated={newStatus => {
                   if (ts) setTs({ ...ts, trang_thai_ho_so: newStatus });
+                  router.push('/dashboard/ho-so');
                 }}
               />
             </CardBody>

@@ -21,6 +21,7 @@ export function PreviewSapXepModal({ open, onClose, kyId, onConfirm }: Props) {
   const [preview, setPreview] = useState<PreviewSapXep | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [locking, setLocking] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -46,6 +47,32 @@ export function PreviewSapXepModal({ open, onClose, kyId, onConfirm }: Props) {
     }
   }
 
+  async function handleLockAll() {
+    setLocking(true);
+    try {
+      const res = await fetch('/api/hosso/khoa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ky_tuyendung_id: kyId })
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      toast.success(`Đã khóa thành công ${j.locked ?? 0} hồ sơ hợp lệ!`);
+      
+      // Tự động load lại preview để cập nhật số liệu
+      setLoading(true);
+      const r = await fetch(`/api/phongthi/preview-sapxep?ky_tuyendung_id=${kyId}`, { cache: 'no-store' });
+      if (r.ok) {
+        const nextJ = await r.json();
+        setPreview(nextJ);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Lỗi khóa hồ sơ');
+    } finally {
+      setLocking(false);
+    }
+  }
+
   const canRun = !!preview && preview.eligible > 0 && preview.rooms > 0;
   const overCapacity = !!preview && preview.eligible > preview.totalCapacity;
 
@@ -58,8 +85,8 @@ export function PreviewSapXepModal({ open, onClose, kyId, onConfirm }: Props) {
       size="md"
       footer={
         <>
-          <Button variant="outline" size="sm" onClick={onClose} disabled={busy}>Hủy</Button>
-          <Button variant="primary" size="sm" onClick={handleConfirm} loading={busy} disabled={!canRun}>
+          <Button variant="outline" size="sm" onClick={onClose} disabled={busy || locking}>Hủy</Button>
+          <Button variant="primary" size="sm" onClick={handleConfirm} loading={busy} disabled={!canRun || locking}>
             <ListChecks size={14} className="mr-1" />Xác nhận xếp phòng
           </Button>
         </>
@@ -103,7 +130,19 @@ export function PreviewSapXepModal({ open, onClose, kyId, onConfirm }: Props) {
                     : 'border-red-200 bg-red-50 text-red-700'
                 }`}>
                   <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                  <span>{w}</span>
+                  <div className="flex-1 flex items-center justify-between gap-2 flex-wrap">
+                    <span>{w}</span>
+                    {w.includes('chưa khóa hồ sơ') && (
+                      <button
+                        type="button"
+                        onClick={handleLockAll}
+                        disabled={busy || locking}
+                        className="rounded bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+                      >
+                        {locking ? 'Đang khóa...' : 'Khóa hồ sơ ngay'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
               {overCapacity && (

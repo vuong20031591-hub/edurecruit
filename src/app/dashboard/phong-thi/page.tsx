@@ -196,10 +196,12 @@ export default function PhongThiPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Xếp phòng thi"
-        description="Phân bổ thí sinh vào phòng thi"
-      />
+      <div className="no-print">
+        <PageHeader
+          title="Xếp phòng thi"
+          description="Phân bổ thí sinh vào phòng thi"
+        />
+      </div>
 
       <div className="space-y-4 p-5">
         {/* No kỳ warning */}
@@ -211,15 +213,29 @@ export default function PhongThiPage() {
         )}
 
         {/* ─── Stat cards (Figma: 4 cards) ─── */}
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="no-print grid grid-cols-2 gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Tổng phòng thi" value={stats.tongPhong} sub={`${stats.phongDaycho} phòng đầy chỗ`} valueColor="text-brand-600" />
           <StatCard label="Tổng sức chứa" value={stats.tongSucChua} sub={`${stats.tongPhong} phòng × ${stats.tongPhong ? Math.round(stats.tongSucChua / stats.tongPhong) : 0} chỗ`} valueColor="text-slate-800" />
           <StatCard label="Đã xếp" value={stats.daXep} sub={`${stats.tongSucChua > 0 ? Math.round(stats.daXep / stats.tongSucChua * 100) : 0}% tổng chỗ ngồi`} valueColor="text-emerald-700" />
           <StatCard label="Còn trống" value={stats.conTrong} sub={`${stats.phongConCho} phòng còn chỗ`} valueColor="text-amber-700" />
         </div>
 
+        {/* Hướng dẫn quy trình xếp phòng */}
+        <div className="no-print rounded-lg border border-blue-200 bg-blue-50/50 p-4 text-sm text-blue-900 shadow-sm">
+          <h4 className="font-semibold text-blue-950 mb-2 flex items-center gap-1.5">
+            <AlertCircle size={16} className="text-blue-600 shrink-0" />
+            Hướng dẫn quy trình xếp phòng thi:
+          </h4>
+          <ol className="list-decimal pl-5 space-y-1.5 text-xs text-blue-800">
+            <li><strong>Bước 1 - Rà soát hồ sơ:</strong> Đảm bảo toàn bộ hồ sơ thí sinh đủ điều kiện đã được duyệt trạng thái là <strong>Hợp lệ</strong>.</li>
+            <li><strong>Bước 2 - Khóa hồ sơ:</strong> Khóa danh sách hồ sơ thí sinh (chốt danh sách) để sẵn sàng xếp phòng.</li>
+            <li><strong>Bước 3 - Xếp phòng tự động:</strong> Bấm nút <strong>Xếp phòng tự động</strong> ở thanh công cụ dưới đây để hệ thống tự động gán SBD và phân chia thí sinh vào phòng thi giảng. <em>(Nếu có thí sinh chưa khóa hồ sơ, bấm nút "Khóa hồ sơ ngay" trong cửa sổ xác nhận)</em>.</li>
+            <li><strong>Bước 4 - Xuất/In danh sách:</strong> Xuất Excel danh sách phòng thi giảng (in từng phòng thi cụ thể) hoặc danh sách phòng chờ (xáo trộn ngẫu nhiên thí sinh cùng cấp học).</li>
+          </ol>
+        </div>
+
         {/* ─── Toolbar (Figma: sapxep button + in + status + toggle) ─── */}
-        <div data-guide="phong-thi-sap-xep" className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div data-guide="phong-thi-sap-xep" className="no-print flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
           {/* Xếp phòng tự động */}
           <Button
             variant="primary"
@@ -251,6 +267,21 @@ export default function PhongThiPage() {
             onClick={handlePrint}
           >
             In danh sách
+          </Button>
+
+          {/* Xuất phòng chờ (Excel) */}
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<Printer size={14} />}
+            onClick={() => {
+              if (kyId) {
+                window.location.href = `/api/bao-cao/xuat?loai=ds-phong-cho&ky_tuyendung_id=${kyId}`;
+              }
+            }}
+            disabled={!kyId}
+          >
+            Xuất phòng chờ (Excel)
           </Button>
 
           {/* Refresh */}
@@ -325,7 +356,14 @@ export default function PhongThiPage() {
           ) : viewMode === 'table' ? (
             <TableView rooms={rooms} onEdit={openEdit} onDelete={openDelete} openMenuId={openMenuId} setOpenMenuId={setOpenMenuId} />
           ) : (
-            <GridView rooms={rooms} onEdit={openEdit} onDelete={openDelete} />
+            <>
+              <div className="no-print">
+                <GridView rooms={rooms} onEdit={openEdit} onDelete={openDelete} />
+              </div>
+              <div className="print-only">
+                <TableView rooms={rooms} onEdit={() => {}} onDelete={() => {}} openMenuId={null} setOpenMenuId={() => {}} />
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -386,7 +424,7 @@ function TableView({
   return (
     <>
       {/* ── Mobile card layout (< lg) ─────────────────────────────────── */}
-      <div className="lg:hidden divide-y divide-slate-100">
+      <div className="lg:hidden divide-y divide-slate-100 no-print">
         {rooms.map((r) => {
           const pct = Math.min(100, r.ty_le_lap_day);
           return (
@@ -423,7 +461,7 @@ function TableView({
               </div>
 
               {/* Action bar */}
-              <div className="flex items-center gap-0 border-t border-slate-100 pt-2 mt-1"
+              <div className="no-print flex items-center gap-0 border-t border-slate-100 pt-2 mt-1"
                    onClick={e => e.stopPropagation()}>
                 <button type="button" onClick={() => onEdit(r)}
                   className="flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 active:bg-slate-200">
@@ -442,7 +480,7 @@ function TableView({
       </div>
 
       {/* ── Desktop table (≥ lg) ──────────────────────────────────────── */}
-      <div className="hidden lg:block overflow-x-auto">
+      <div className="hidden lg:block print-table overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50">
             <tr>
@@ -453,7 +491,7 @@ function TableView({
               <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Đã xếp</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Tỷ lệ lấp đầy</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Trạng thái</th>
-              <th className="w-12 px-4 py-3" />
+              <th className="w-12 px-4 py-3 no-print" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
@@ -481,7 +519,7 @@ function TableView({
                 <td className="px-4 py-3">
                   <TrangThaiBadge trangThai={r.trang_thai} soXep={r.so_luong_da_xep} sucChua={r.suc_chua} />
                 </td>
-                <td className="px-4 py-3 text-right">
+                <td className="px-4 py-3 text-right no-print">
                   <div className="relative inline-block">
                     <button
                       type="button"
@@ -555,7 +593,7 @@ function GridView({ rooms, onEdit, onDelete }: { rooms: PhongThiView[]; onEdit: 
               </div>
             </div>
             <div className="mt-2 text-xs text-slate-400">{r.ngay_thi} · {r.gio_thi}</div>
-            <div className="mt-3 flex gap-1.5">
+            <div className="no-print mt-3 flex gap-1.5">
               <button
                 type="button"
                 onClick={() => onEdit(r)}

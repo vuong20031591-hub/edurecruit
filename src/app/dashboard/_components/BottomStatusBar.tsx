@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 export function BottomStatusBar() {
   const now = new Date();
   return (
-    <footer className="flex h-6 shrink-0 items-center justify-between border-t border-slate-700/50 bg-slate-800 px-4 text-2xs text-slate-300">
+    <footer className="no-print flex h-6 shrink-0 items-center justify-between border-t border-slate-700/50 bg-slate-800 px-4 text-2xs text-slate-300">
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-status-success" />

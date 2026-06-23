@@ -1,4 +1,4 @@
-﻿import { getDb } from '@/db';
+import { getDb } from '@/db';
 import type { PhongThi } from '@/db/schema';
 import type { PhongThiFilter, PhongThiView, PhongThiStats, PhongThiCreate, PhongThiUpdate } from './types';
 
@@ -381,67 +381,76 @@ export const phongthiRepository = {
         s.total = 0;
       }
 
-      // 2. Gán SBD tăng dần TOÀN KỲ (SBD flat per PRD Bước 4: "SBD-{4 chữ số}").
-      // Thứ tự gán = thứ tự sort (vị trí → đơn vị → tên → họ), nên TS vị trí 1
-      // sẽ có SBD thấp hơn TS vị trí 2, hợp lý với "theo ABC tên trong cùng vị trí".
+      // 2. Gán SBD và xếp phòng
       let sbdSeq = 0;
+      const viTriIds = Array.from(new Set(candidates.map(c => c.vi_tri_dang_ky_id)));
 
-      for (const ts of candidates) {
-        // Tìm phòng cùng vị trí còn chỗ
-        const sameViTri = rooms.filter(r => r.vi_tri_dang_ky_id === ts.vi_tri_dang_ky_id);
-        if (sameViTri.length === 0) {
-          skipped++;
-          warnings.push(`Thí sinh #${ts.id} (${ts.ho} ${ts.ten}): không có phòng cho vị trí ${ts.vi_tri_dang_ky_id}`);
+      for (const viTriId of viTriIds) {
+        // Lấy danh sách thí sinh và phòng của vị trí này
+        const candidatesForViTri = candidates.filter(c => c.vi_tri_dang_ky_id === viTriId);
+        const roomsForViTri = rooms.filter(r => r.vi_tri_dang_ky_id === viTriId);
+
+        if (roomsForViTri.length === 0) {
+          for (const ts of candidatesForViTri) {
+            skipped++;
+            warnings.push(`Thí sinh #${ts.id} (${ts.ho} ${ts.ten}): không có phòng cho vị trí ${viTriId}`);
+          }
           continue;
         }
 
-        const availableRooms = sameViTri
-          .map(r => roomState.get(r.id)!)
-          .filter(s => s.available > 0);
-
-        if (availableRooms.length === 0) {
-          skipped++;
-          warnings.push(`Thí sinh #${ts.id} (${ts.ho} ${ts.ten}): hết chỗ trống cho vị trí ${ts.vi_tri_dang_ky_id}`);
-          continue;
+        // Nhóm thí sinh theo đơn vị tuyển dụng
+        const candidatesByUnit = new Map<number, typeof candidates>();
+        for (const ts of candidatesForViTri) {
+          if (!candidatesByUnit.has(ts.don_vi_du_tuyen_id)) {
+            candidatesByUnit.set(ts.don_vi_du_tuyen_id, []);
+          }
+          candidatesByUnit.get(ts.don_vi_du_tuyen_id)!.push(ts);
         }
 
-        // Chọn phòng: ưu tiên cùng đơn vị, sau đó round-robin (phòng ít ngưởi nhất)
-        const donVi = ts.don_vi_du_tuyen_id;
-        let targetId: number;
+        // Trải phẳng danh sách thí sinh đã gom theo đơn vị (đơn vị sắp xếp theo ID)
+        const sortedCandidatesForViTri: typeof candidates = [];
+        const sortedUnitIds = Array.from(candidatesByUnit.keys()).sort((a, b) => a - b);
+        for (const unitId of sortedUnitIds) {
+          sortedCandidatesForViTri.push(...candidatesByUnit.get(unitId)!);
+        }
 
-        const withSameUnit = availableRooms
-          .map(s => ({
-            id: s.id,
-            sameUnitCount: s.unitCounts.get(donVi) ?? 0,
-            total: s.total,
-            available: s.available,
-          }))
-          .sort((a, b) => {
-            // 1. Ưu tiên phòng đã có cùng đơn vị (count cao hơn)
-            if (b.sameUnitCount !== a.sameUnitCount) return b.sameUnitCount - a.sameUnitCount;
-            // 2. Round-robin giữa các phòng cùng nhóm: chọn phòng có tổng số ngưởi ít hơn
-            return a.total - b.total;
-          });
+        let roomIdx = 0;
+        for (const ts of sortedCandidatesForViTri) {
+          // Tìm phòng thi còn chỗ
+          while (roomIdx < roomsForViTri.length) {
+            const rState = roomState.get(roomsForViTri[roomIdx].id)!;
+            if (rState.available > 0) {
+              break;
+            }
+            roomIdx++;
+          }
 
-        targetId = withSameUnit[0].id;
+          if (roomIdx >= roomsForViTri.length) {
+            skipped++;
+            warnings.push(`Thí sinh #${ts.id} (${ts.ho} ${ts.ten}): hết chỗ trống cho vị trí ${viTriId}`);
+            continue;
+          }
 
-        // Gán SBD
-        sbdSeq++;
-        const sbd = `SBD-${String(sbdSeq).padStart(4, '0')}`;
+          const targetRoom = roomsForViTri[roomIdx];
+          const rState = roomState.get(targetRoom.id)!;
 
-        // Persist
-        updateThisinhSbd.run(sbd, ts.id);
-        insertDiemthi.run(ts.id, targetId);
-        updatePhong.run(targetId);
+          // Gán SBD
+          sbdSeq++;
+          const sbd = `SBD-${String(sbdSeq).padStart(4, '0')}`;
 
-        // Update runtime state
-        const s = roomState.get(targetId)!;
-        s.available--;
-        s.total++;
-        s.unitCounts.set(donVi, (s.unitCounts.get(donVi) ?? 0) + 1);
+          // Persist
+          updateThisinhSbd.run(sbd, ts.id);
+          insertDiemthi.run(ts.id, targetRoom.id);
+          updatePhong.run(targetRoom.id);
 
-        assignments.push({ thisinh_id: ts.id, phongthi_id: targetId, sbd });
-        assigned++;
+          // Update runtime state
+          rState.available--;
+          rState.total++;
+          rState.unitCounts.set(ts.don_vi_du_tuyen_id, (rState.unitCounts.get(ts.don_vi_du_tuyen_id) ?? 0) + 1);
+
+          assignments.push({ thisinh_id: ts.id, phongthi_id: targetRoom.id, sbd });
+          assigned++;
+        }
       }
     });
 

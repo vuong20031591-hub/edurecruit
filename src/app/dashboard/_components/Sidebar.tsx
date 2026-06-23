@@ -140,7 +140,7 @@ export function Sidebar({ quyen }: SidebarProps) {
     <>
       {/* Desktop sidebar */}
       <aside data-guide="sidebar" className={cn(
-        "hidden shrink-0 flex-col border-r border-white/5 bg-slate-900 text-slate-200 md:flex transition-all duration-300",
+        "no-print hidden shrink-0 flex-col border-r border-white/5 bg-slate-900 text-slate-200 md:flex transition-all duration-300",
         collapsed ? "w-16" : "w-56"
       )}>
         {navContent}
@@ -151,7 +151,7 @@ export function Sidebar({ quyen }: SidebarProps) {
         type="button"
         onClick={() => setMobileOpen(true)}
         aria-label="Mở menu"
-        className="fixed left-3 top-3 z-40 flex h-9 w-9 items-center justify-center rounded-md bg-slate-900 text-white shadow-md md:hidden"
+        className="no-print fixed left-3 top-3 z-40 flex h-9 w-9 items-center justify-center rounded-md bg-slate-900 text-white shadow-md md:hidden"
       >
         <Menu size={18} />
       </button>
@@ -165,7 +165,7 @@ export function Sidebar({ quyen }: SidebarProps) {
             onClick={() => setMobileOpen(false)}
           />
           {/* Drawer */}
-          <aside className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-slate-900 text-slate-200 md:hidden">
+          <aside className="no-print fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-slate-900 text-slate-200 md:hidden">
             {navContent}
           </aside>
         </>

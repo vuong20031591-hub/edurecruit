@@ -39,6 +39,9 @@
   .print-only {
     @apply block;
   }
+  .print-table {
+    display: block !important;
+  }
   body {
     @apply bg-white;
   }

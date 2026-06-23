@@ -7,17 +7,105 @@ import ExcelJS from 'exceljs';
  * GET /api/bao-cao/xuat?ky_tuyendung_id=X&loai=ds-du-thi|ket-qua-diem|bang-diem-phong
  * Xuất file Excel cho trang Báo cáo
  */
+function getPhongChoAssignments(db: any, kyId: number) {
+  const candidates = db.prepare(`
+    SELECT t.id, t.ho_ten, t.sbd, t.ngay_sinh, t.gioi_tinh, v.mon AS vi_tri, v.cap_hoc, d.ten_don_vi AS don_vi
+    FROM thisinh t
+    LEFT JOIN vitri_tuyendung v ON v.id = t.vi_tri_dang_ky_id
+    LEFT JOIN don_vi_tuyen_dung d ON d.id = t.don_vi_du_tuyen_id
+    WHERE t.ky_tuyendung_id = ?
+      AND t.trang_thai_ho_so = 'HopLe'
+      AND t.is_profile_locked = 1
+      AND t.cccd IS NOT NULL
+      AND t.cccd != ''
+    ORDER BY v.cap_hoc ASC, t.id ASC
+  `).all(kyId) as { id: number; ho_ten: string; sbd: string | null; ngay_sinh: string; gioi_tinh: string; vi_tri: string; cap_hoc: string; don_vi: string }[];
+
+  // Lấy sức chứa mặc định của phòng thi (config)
+  const configSucChua = db.prepare(`
+    SELECT value FROM system_config WHERE key = 'phong_thi.suc_chua_mac_dinh'
+  `).get() as { value: string } | undefined;
+  const maxCapacity = configSucChua ? Number(configSucChua.value) : 24; // Mặc định là 24 nếu không cấu hình
+
+  // Nhóm theo cấp học
+  const byCapHoc = new Map<string, typeof candidates>();
+  for (const c of candidates) {
+    const cap = c.cap_hoc || 'KHAC';
+    if (!byCapHoc.has(cap)) byCapHoc.set(cap, []);
+    byCapHoc.get(cap)!.push(c);
+  }
+
+  // Thuật toán xáo trộn ngẫu nhiên có seed cố định
+  function seededShuffle<T>(array: T[], seed: number): T[] {
+    const arr = [...array];
+    let currSeed = seed;
+    for (let i = arr.length - 1; i > 0; i--) {
+      const r = Math.sin(currSeed++) * 10000;
+      const randomValue = r - Math.floor(r);
+      const j = Math.floor(randomValue * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  const assignmentMap = new Map<number, string>(); // thisinh_id -> phong_cho_name
+  const phongChoList: { name: string; cap_hoc: string; candidates: typeof candidates }[] = [];
+
+  // Để đồng bộ seed qua các lần chạy, sử dụng kyId làm seed gốc
+  let globalSeed = kyId + 179;
+
+  // Lần lượt duyệt qua từng cấp học
+  const sortedCapHocs = Array.from(byCapHoc.keys()).sort();
+  for (const capHoc of sortedCapHocs) {
+    const list = byCapHoc.get(capHoc)!;
+    // Xáo trộn ngẫu nhiên danh sách thí sinh cùng cấp học
+    const shuffledList = seededShuffle(list, globalSeed);
+    // Cập nhật globalSeed để cấp học sau không trùng pattern xáo trộn của cấp học trước
+    globalSeed += shuffledList.length + 7;
+
+    // Chia vào các phòng chờ
+    let roomSeq = 1;
+    for (let i = 0; i < shuffledList.length; i += maxCapacity) {
+      const chunk = shuffledList.slice(i, i + maxCapacity);
+      const roomName = `Phòng chờ ${String(roomSeq).padStart(2, '0')} - Cấp ${capHoc}`;
+      
+      phongChoList.push({
+        name: roomName,
+        cap_hoc: capHoc,
+        candidates: chunk,
+      });
+
+      for (const ts of chunk) {
+        assignmentMap.set(ts.id, roomName);
+      }
+      roomSeq++;
+    }
+  }
+
+  return { assignmentMap, phongChoList };
+}
+
 export async function GET(req: NextRequest) {
   try {
     await requirePerm(req, 'baocao.xuat');
     const sp = req.nextUrl.searchParams;
     const kyId = sp.get('ky_tuyendung_id');
     const loai = sp.get('loai');
-    if (!kyId) return json({ error: 'Thiếu ky_tuyendung_id' }, { status: 400 });
+    const phongthiId = sp.get('phongthi_id');
+
     if (!loai) return json({ error: 'Thiếu loai' }, { status: 400 });
 
     const db = getDb();
-    const id = Number(kyId);
+    let id = kyId ? Number(kyId) : 0;
+    if (phongthiId) {
+      const roomRow = db.prepare(`SELECT ky_tuyendung_id FROM phongthi WHERE id = ?`).get(Number(phongthiId)) as { ky_tuyendung_id: number } | undefined;
+      if (roomRow) {
+        id = roomRow.ky_tuyendung_id;
+      }
+    }
+
+    if (!id) return json({ error: 'Thiếu ky_tuyendung_id hoặc phongthi_id không hợp lệ' }, { status: 400 });
+
     const wb = new ExcelJS.Workbook();
 
     // Helper: header style
@@ -157,6 +245,107 @@ export async function GET(req: NextRequest) {
           }
         });
       }
+    } else if (loai === 'ds-phong-thi') {
+      const ptId = phongthiId ? Number(phongthiId) : null;
+      if (!ptId) return json({ error: 'Thiếu phongthi_id' }, { status: 400 });
+
+      const phongRow = db.prepare(`
+        SELECT p.ma_phong, p.ten_phong, v.mon AS vi_tri
+        FROM phongthi p
+        LEFT JOIN vitri_tuyendung v ON v.id = p.vi_tri_dang_ky_id
+        WHERE p.id = ?
+      `).get(ptId) as { ma_phong: string; ten_phong: string | null; vi_tri: string } | undefined;
+
+      if (!phongRow) return json({ error: 'Không tìm thấy phòng thi' }, { status: 404 });
+
+      const ws = wb.addWorksheet(`Phòng ${phongRow.ma_phong}`);
+      ws.columns = [
+        { header: 'STT', key: 'stt', width: 6 },
+        { header: 'Mã hồ sơ', key: 'ma_ho_so', width: 16 },
+        { header: 'SBD', key: 'sbd', width: 10 },
+        { header: 'Họ tên', key: 'ho_ten', width: 28 },
+        { header: 'Ngày sinh', key: 'ngay_sinh', width: 12 },
+        { header: 'Giới tính', key: 'gioi_tinh', width: 10 },
+        { header: 'Đơn vị dự tuyển', key: 'don_vi', width: 32 },
+        { header: 'Phòng chờ', key: 'phong_cho', width: 24 },
+      ];
+      styleHeader(ws.getRow(1));
+
+      // Lấy map phòng chờ
+      const { assignmentMap } = getPhongChoAssignments(db, id);
+
+      const rows = db.prepare(`
+        SELECT t.id, t.ma_ho_so, t.sbd, t.ho_ten, t.ngay_sinh, t.gioi_tinh, d.ten_don_vi AS don_vi
+        FROM thisinh t
+        JOIN diemthi dt ON dt.thisinh_id = t.id
+        LEFT JOIN don_vi_tuyen_dung d ON d.id = t.don_vi_du_tuyen_id
+        WHERE dt.phongthi_id = ?
+        ORDER BY t.sbd ASC, t.ho_ten ASC
+      `).all(ptId) as Record<string, any>[];
+
+      rows.forEach((r, i) => {
+        const phongChoName = assignmentMap.get(r.id) || 'Chưa xếp';
+        const row = ws.addRow({
+          stt: i + 1,
+          ma_ho_so: r.ma_ho_so,
+          sbd: r.sbd,
+          ho_ten: r.ho_ten,
+          ngay_sinh: r.ngay_sinh,
+          gioi_tinh: r.gioi_tinh,
+          don_vi: r.don_vi,
+          phong_cho: phongChoName,
+        });
+        if (i % 2 === 1) {
+          row.eachCell(cell => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+          });
+        }
+      });
+
+    } else if (loai === 'ds-phong-cho') {
+      const { phongChoList } = getPhongChoAssignments(db, id);
+
+      if (phongChoList.length === 0) {
+        const ws = wb.addWorksheet('Danh sách trống');
+        ws.addRow(['Không có dữ liệu phòng chờ']);
+      }
+
+      for (const pc of phongChoList) {
+        // Tên sheet tối đa 31 ký tự trong Excel
+        const ws = wb.addWorksheet(pc.name.substring(0, 31));
+        ws.columns = [
+          { header: 'STT', key: 'stt', width: 6 },
+          { header: 'SBD', key: 'sbd', width: 10 },
+          { header: 'Họ tên', key: 'ho_ten', width: 28 },
+          { header: 'Vị trí thi', key: 'vi_tri', width: 24 },
+          { header: 'Đơn vị dự tuyển', key: 'don_vi', width: 32 },
+          { header: 'Mã đề / Phách bốc thăm', key: 'ma_de', width: 22 },
+          { header: 'Thời gian bắt đầu chuẩn bị', key: 'tg_bat_dau', width: 24 },
+          { header: 'Thời gian kết thúc / Gọi vào', key: 'tg_ket_thuc', width: 24 },
+          { header: 'Chữ ký thí sinh', key: 'chu_ky', width: 20 },
+        ];
+        styleHeader(ws.getRow(1));
+
+        pc.candidates.forEach((r, i) => {
+          const row = ws.addRow({
+            stt: i + 1,
+            sbd: r.sbd,
+            ho_ten: r.ho_ten,
+            vi_tri: r.vi_tri,
+            don_vi: r.don_vi,
+            ma_de: '',
+            tg_bat_dau: '',
+            tg_ket_thuc: '',
+            chu_ky: '',
+          });
+          if (i % 2 === 1) {
+            row.eachCell(cell => {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+            });
+          }
+        });
+      }
+
     } else {
       return json({ error: 'loai không hợp lệ' }, { status: 400 });
     }
