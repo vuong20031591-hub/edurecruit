@@ -1,4 +1,4 @@
-﻿/**
+/**
  * hosso module - service
  * File: src/modules/hosso/service.ts
  */
@@ -420,6 +420,38 @@ export const hossoService = {
     });
 
     return { locked };
+  },
+
+  async lockSingleThiSinh(id: number, session: Session): Promise<ThiSinh> {
+    requirePerm(session, 'hosso.khoa');
+    const userId = getUserId(session);
+
+    const before = hossoRepository.findById(id);
+    if (!before) throw new NotFoundError(`Không tìm thấy thí sinh #${id}`);
+
+    if (before.trang_thai_ho_so !== TrangThaiHoSo.HopLe) {
+      throw new ValidationError('Chỉ được phép duyệt (khóa) các hồ sơ có trạng thái Hợp lệ');
+    }
+
+    if (before.is_profile_locked === 1) {
+      throw new ConflictError('Hồ sơ này đã được duyệt (khóa) trước đó');
+    }
+
+    const after = hossoRepository.update(id, {
+      is_profile_locked: 1,
+      locked_at: new Date().toISOString(),
+      locked_by: userId,
+      updated_by: userId
+    });
+
+    const meta = baseMeta(session, 'thisinh', id);
+    audit({
+      ...meta,
+      action: 'KHOA_HO_SO',
+      payload: { thisinh_id: id }
+    });
+
+    return after;
   },
 
   async importFromExcel(

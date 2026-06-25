@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Eye, Pencil, Trash2, CalendarDays, CreditCard, Building2, Hash } from 'lucide-react';
+import { Eye, Pencil, Trash2, CalendarDays, CreditCard, Building2, Hash, CheckSquare } from 'lucide-react';
 import { Table, THead, TBody, TR, TH, TD } from '@/shared/components/Table';
 import { Badge } from '@/shared/components/Badge';
 import { formatDate, buildViTriLabel } from '@/shared/lib/format';
@@ -9,7 +9,7 @@ import type { ThiSinhView } from '@/modules/hosso/types';
 import type { TrangThaiHoSo as TrangThaiHoSoType } from '@/db/schema';
 import { cn } from '@/shared/lib/cn';
 
-export type ThiSinhAction = 'view' | 'edit' | 'delete';
+export type ThiSinhAction = 'view' | 'edit' | 'delete' | 'lock';
 
 interface ThiSinhTableProps {
   data: ThiSinhView[];
@@ -18,12 +18,8 @@ interface ThiSinhTableProps {
   onRowClick: (id: number) => void;
   onAction: (action: ThiSinhAction, id: number) => void;
   onSelectionChange?: (ids: number[]) => void;
-  /**
-   * Selection bên ngoài (controlled). Khi prop này thay đổi (vd parent clear
-   * selection khi đổi page, hoặc nhấn ✕ "Bỏ chọn"), state local của table
-   * sẽ sync theo — tránh checkbox vẫn hiển thị tick sau khi parent clear.
-   */
   selectedIds?: number[];
+  canLock?: boolean;
 }
 
 const TRANG_THAI_BADGE: Record<TrangThaiHoSoType, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
@@ -34,7 +30,7 @@ const TRANG_THAI_BADGE: Record<TrangThaiHoSoType, 'success' | 'warning' | 'dange
   DaChinhSua: 'info'
 };
 
-export function ThiSinhTable({ data, page, pageSize, onRowClick, onAction, onSelectionChange, selectedIds }: ThiSinhTableProps) {
+export function ThiSinhTable({ data, page, pageSize, onRowClick, onAction, onSelectionChange, selectedIds, canLock }: ThiSinhTableProps) {
   const year = new Date().getFullYear();
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
@@ -161,6 +157,19 @@ export function ThiSinhTable({ data, page, pageSize, onRowClick, onAction, onSel
                 className="flex items-center gap-0 border-t border-slate-100 pt-2 mt-1 -mx-0"
                 onClick={e => e.stopPropagation()}
               >
+                {trangThai === TrangThaiHoSo.HopLe && !isLocked && canLock && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onAction('lock', ts.id)}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-50 active:bg-emerald-100"
+                    >
+                      <CheckSquare size={14} />
+                      Duyệt
+                    </button>
+                    <div className="h-5 w-px bg-slate-200" />
+                  </>
+                )}
                 <button
                   type="button"
                   onClick={() => onAction('view', ts.id)}
@@ -273,6 +282,13 @@ export function ThiSinhTable({ data, page, pageSize, onRowClick, onAction, onSel
                 </TD>
                 <TD className="text-center">
                   <div className="flex items-center justify-center gap-0.5" onClick={e => e.stopPropagation()}>
+                    {trangThai === TrangThaiHoSo.HopLe && !isLocked && canLock && (
+                      <button type="button" onClick={() => onAction('lock', ts.id)}
+                        className="rounded p-1.5 text-emerald-500 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+                        aria-label="Duyệt hồ sơ" title="Duyệt hồ sơ">
+                        <CheckSquare size={15} />
+                      </button>
+                    )}
                     <button type="button" onClick={() => onAction('view', ts.id)}
                       className="rounded p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-brand-600"
                       aria-label="Xem" title="Xem">

@@ -234,9 +234,10 @@ export default function HoSoDetailPage({ params }: { params: Promise<{ id: strin
     ? 'Điền đầy đủ thông tin để tạo hồ sơ thí sinh mới'
     : `Mã HS: #${ts?.id ?? thisinhId ?? '—'}  ·  Trạng thái: ${ts ? TrangThaiHoSoLabel[ts.trang_thai_ho_so as TrangThaiHoSo] : '—'}`;
 
-  const canUpdate = isNew ? perms.includes('hosso.create') : perms.includes('hosso.update');
-  const canDelete = !isNew && perms.includes('hosso.delete');
-  const canRasoat = perms.includes('hosso.rasoat');
+  const isLocked = ts?.is_profile_locked === 1;
+  const canUpdate = !isLocked && (isNew ? perms.includes('hosso.create') : perms.includes('hosso.update'));
+  const canDelete = !isLocked && !isNew && perms.includes('hosso.delete');
+  const canRasoat = !isLocked && perms.includes('hosso.rasoat');
 
   return (
     <div>
@@ -386,8 +387,14 @@ export default function HoSoDetailPage({ params }: { params: Promise<{ id: strin
                 trangThaiHienTai={ts?.trang_thai_ho_so ?? 'ChoRaSoat'}
                 hoTen={ts?.ho_ten ?? ''}
                 canRasoat={canRasoat}
+                canLock={perms.includes('hosso.khoa')}
+                isLocked={isLocked}
                 onUpdated={newStatus => {
                   if (ts) setTs({ ...ts, trang_thai_ho_so: newStatus });
+                  router.push('/dashboard/ho-so');
+                }}
+                onLocked={() => {
+                  if (ts) setTs({ ...ts, is_profile_locked: 1 });
                   router.push('/dashboard/ho-so');
                 }}
               />

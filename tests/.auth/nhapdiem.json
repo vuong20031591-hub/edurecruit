@@ -2,10 +2,10 @@
   "cookies": [
     {
       "name": "edurecruit_session",
-      "value": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxNSIsInVzZXJuYW1lIjoibmhhcGRpZW0iLCJxdXllbiI6IlRPX05IQVBfRElFTSIsImhvX3RlbiI6IlThu5UgTmjhuq1wIMSQaeG7g20iLCJpYXQiOjE3ODIyNTYzODcsImV4cCI6MTc4MjI4NTE4NywiaXNzIjoiZWR1cmVjcnVpdCJ9.DaqCVqdR0JzOY_wn7p-hkInTmy4W5VCu_A7RxA1aCx8",
+      "value": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxNSIsInVzZXJuYW1lIjoibmhhcGRpZW0iLCJxdXllbiI6IlRPX05IQVBfRElFTSIsImhvX3RlbiI6IlThu5UgTmjhuq1wIMSQaeG7g20iLCJpYXQiOjE3ODIzNjg4MDQsImV4cCI6MTc4MjM5NzYwNCwiaXNzIjoiZWR1cmVjcnVpdCJ9.HujYBTY2FP71ytTmPuvcnuyc8BYIR2mMKDJLNc8ts-A",
       "domain": "localhost",
       "path": "/",
-      "expires": 1782285187.386642,
+      "expires": 1782397604.848367,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"

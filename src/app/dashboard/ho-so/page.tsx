@@ -428,7 +428,7 @@ export default function HoSoListPage() {
     }
   }
 
-  function handleAction(action: ThiSinhAction, id: number) {
+  async function handleAction(action: ThiSinhAction, id: number) {
     if (action === 'view') {
       router.push(`/dashboard/ho-so/${id}`);
       return;
@@ -439,6 +439,23 @@ export default function HoSoListPage() {
     }
     if (action === 'delete') {
       toast.warning(`TODO: xác nhận xóa hồ sơ #${id}`);
+      return;
+    }
+    if (action === 'lock') {
+      if (!window.confirm('Bạn có chắc chắn muốn duyệt và khóa hồ sơ này? Sau khi duyệt không thể chỉnh sửa thông tin.')) {
+        return;
+      }
+      try {
+        const res = await fetch(`/api/hosso/${id}/khoa`, { method: 'POST' });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `HTTP ${res.status}`);
+        }
+        toast.success('Đã duyệt và khóa hồ sơ thành công');
+        handleRefresh();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Lỗi duyệt hồ sơ');
+      }
     }
   }
 
@@ -580,6 +597,7 @@ export default function HoSoListPage() {
                 onAction={handleAction}
                 onSelectionChange={handleSelectionChange}
                 selectedIds={selectedIds}
+                canLock={quyen === 'ADMIN'}
               />
               <Pagination
                 page={data.page}

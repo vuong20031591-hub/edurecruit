@@ -10,7 +10,10 @@ interface Props {
   trangThaiHienTai: TrangThaiHoSo;
   hoTen: string;
   canRasoat: boolean;
+  canLock: boolean;
+  isLocked: boolean;
   onUpdated: (newStatus: TrangThaiHoSo) => void;
+  onLocked?: () => void;
 }
 
 function statusBadgeVariant(status: TrangThaiHoSo): 'success' | 'warning' | 'danger' | 'info' | 'neutral' {
@@ -31,10 +34,11 @@ const TRANSITIONS: Record<TrangThaiHoSo, TrangThaiHoSo[]> = {
   DaChinhSua:      ['HopLe', 'CanBoSung', 'ChoRaSoat']
 };
 
-export function TrangThaiActions({ thisinhId, trangThaiHienTai, hoTen, canRasoat, onUpdated }: Props) {
+export function TrangThaiActions({ thisinhId, trangThaiHienTai, hoTen, canRasoat, canLock, isLocked, onUpdated, onLocked }: Props) {
   const [newStatus, setNewStatus] = useState<TrangThaiHoSo | ''>('');
   const [lyDo, setLyDo] = useState('');
   const [saving, setSaving] = useState(false);
+  const [locking, setLocking] = useState(false);
 
   async function handleUpdate() {
     if (!newStatus) {
@@ -67,16 +71,53 @@ export function TrangThaiActions({ thisinhId, trangThaiHienTai, hoTen, canRasoat
     }
   }
 
+  async function handleLock() {
+    if (!window.confirm(`Bạn có chắc chắn muốn duyệt và khóa hồ sơ của thí sinh "${hoTen}"?\nSau khi duyệt, thông tin hồ sơ sẽ không thể chỉnh sửa.`)) {
+      return;
+    }
+    setLocking(true);
+    try {
+      const res = await fetch(`/api/hosso/${thisinhId}/khoa`, { method: 'POST' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      toast.success('Đã duyệt hồ sơ thành công');
+      onLocked?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Lỗi duyệt hồ sơ');
+    } finally {
+      setLocking(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
-        <span className="text-sm text-slate-600">Trạng thái hiện tại của <b>{hoTen || '—'}</b>:</span>
-        <Badge variant={statusBadgeVariant(trangThaiHienTai)}>
-          {TrangThaiHoSoLabel[trangThaiHienTai]}
-        </Badge>
+      <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-slate-600">Trạng thái hiện tại của <b>{hoTen || '—'}</b>:</span>
+          <Badge variant={statusBadgeVariant(trangThaiHienTai)}>
+            {isLocked && '🔒 '}{TrangThaiHoSoLabel[trangThaiHienTai]}
+          </Badge>
+        </div>
+        {trangThaiHienTai === 'HopLe' && !isLocked && canLock && (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleLock}
+            loading={locking}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            Duyệt hồ sơ
+          </Button>
+        )}
       </div>
 
-      {canRasoat ? (
+      {isLocked ? (
+        <p className="text-sm text-slate-500 italic">
+          Hồ sơ đã được duyệt và khóa. Không thể thực hiện thêm thao tác thay đổi trạng thái.
+        </p>
+      ) : canRasoat ? (
         <div className="space-y-3">
           <Select
             label="Chuyển sang trạng thái"
