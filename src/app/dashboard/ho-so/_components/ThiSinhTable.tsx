@@ -178,24 +178,28 @@ export function ThiSinhTable({ data, page, pageSize, onRowClick, onAction, onSel
                   <Eye size={14} />
                   Xem
                 </button>
-                <div className="h-5 w-px bg-slate-200" />
-                <button
-                  type="button"
-                  onClick={() => onAction('edit', ts.id)}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 active:bg-slate-200"
-                >
-                  <Pencil size={14} />
-                  Sửa
-                </button>
-                <div className="h-5 w-px bg-slate-200" />
-                <button
-                  type="button"
-                  onClick={() => onAction('delete', ts.id)}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-xs font-medium text-red-500 transition-colors hover:bg-red-50 active:bg-red-100"
-                >
-                  <Trash2 size={14} />
-                  Xóa
-                </button>
+                {!isLocked && (
+                  <>
+                    <div className="h-5 w-px bg-slate-200" />
+                    <button
+                      type="button"
+                      onClick={() => onAction('edit', ts.id)}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 active:bg-slate-200"
+                    >
+                      <Pencil size={14} />
+                      Sửa
+                    </button>
+                    <div className="h-5 w-px bg-slate-200" />
+                    <button
+                      type="button"
+                      onClick={() => onAction('delete', ts.id)}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-xs font-medium text-red-500 transition-colors hover:bg-red-50 active:bg-red-100"
+                    >
+                      <Trash2 size={14} />
+                      Xóa
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -294,16 +298,20 @@ export function ThiSinhTable({ data, page, pageSize, onRowClick, onAction, onSel
                       aria-label="Xem" title="Xem">
                       <Eye size={15} />
                     </button>
-                    <button type="button" onClick={() => onAction('edit', ts.id)}
-                      className="rounded p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                      aria-label="Sửa" title="Sửa">
-                      <Pencil size={15} />
-                    </button>
-                    <button type="button" onClick={() => onAction('delete', ts.id)}
-                      className="rounded p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                      aria-label="Xóa" title="Xóa">
-                      <Trash2 size={15} />
-                    </button>
+                    {!isLocked && (
+                      <>
+                        <button type="button" onClick={() => onAction('edit', ts.id)}
+                          className="rounded p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                          aria-label="Sửa" title="Sửa">
+                          <Pencil size={15} />
+                        </button>
+                        <button type="button" onClick={() => onAction('delete', ts.id)}
+                          className="rounded p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                          aria-label="Xóa" title="Xóa">
+                          <Trash2 size={15} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </TD>
               </TR>

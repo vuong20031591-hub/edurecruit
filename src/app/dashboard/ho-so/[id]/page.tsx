@@ -250,7 +250,10 @@ export default function HoSoDetailPage({ params }: { params: Promise<{ id: strin
               variant="ghost"
               size="sm"
               leftIcon={<ArrowLeft size={14} />}
-              onClick={() => router.back()}
+              onClick={() => {
+                router.push('/dashboard/ho-so');
+                router.refresh();
+              }}
             >
               Quay lại
             </Button>
@@ -392,10 +395,12 @@ export default function HoSoDetailPage({ params }: { params: Promise<{ id: strin
                 onUpdated={newStatus => {
                   if (ts) setTs({ ...ts, trang_thai_ho_so: newStatus });
                   router.push('/dashboard/ho-so');
+                  router.refresh();
                 }}
                 onLocked={() => {
                   if (ts) setTs({ ...ts, is_profile_locked: 1 });
                   router.push('/dashboard/ho-so');
+                  router.refresh();
                 }}
               />
             </CardBody>

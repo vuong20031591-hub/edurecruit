@@ -107,6 +107,21 @@ export default function HoSoListPage() {
     if (listRes.error) setError(listRes.error.message);
   }, [listRes.error]);
 
+  // Tự động làm mới danh sách khi quay lại trang (back button) hoặc focus lại tab
+  useEffect(() => {
+    const handleRefreshEvents = () => {
+      listRes.refresh();
+    };
+    window.addEventListener('pageshow', handleRefreshEvents);
+    window.addEventListener('popstate', handleRefreshEvents);
+    window.addEventListener('focus', handleRefreshEvents);
+    return () => {
+      window.removeEventListener('pageshow', handleRefreshEvents);
+      window.removeEventListener('popstate', handleRefreshEvents);
+      window.removeEventListener('focus', handleRefreshEvents);
+    };
+  }, [listRes]);
+
   function handleFilterChange(next: ThiSinhFilter) {
     setFilter(next);
     setSelectedIds([]);
