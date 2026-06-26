@@ -1,4 +1,4 @@
-﻿import { phongthiRepository } from './repository';
+import { phongthiRepository } from './repository';
 import { ValidationError, NotFoundError, ConflictError } from '@/server/api';
 import type { Session } from '@/server/auth';
 import { audit } from '@/server/audit';

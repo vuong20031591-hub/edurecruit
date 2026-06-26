@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { cn } from '@/shared/lib/cn';
 import {
   LayoutDashboard, FileText, Calendar, ClipboardCheck,
-  BarChart3, Settings, GraduationCap, ChevronLeft, ChevronRight, Menu, X
+  BarChart3, Settings, GraduationCap, ChevronLeft, ChevronRight, Menu, X, Building2
 } from 'lucide-react';
 import { useTopbar } from '@/shared/hooks/useTopbar';
 import type { Quyen } from '@/db/schema';
@@ -23,6 +23,8 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard',           label: 'Tổng quan',              icon: LayoutDashboard, exact: true },
   { href: '/dashboard/ho-so',     label: 'Quản lý Hồ sơ',         icon: FileText,        badgeKey: 'hoSoChoDuyet' },
+  { href: '/dashboard/vi-tri',    label: 'Vị trí tuyển dụng',      icon: GraduationCap,   visibleFor: ['ADMIN', 'TO_NHAP_HOSO'] },
+  { href: '/dashboard/don-vi',    label: 'Đơn vị tuyển dụng',      icon: Building2,       visibleFor: ['ADMIN', 'TO_NHAP_HOSO'] },
   // Xếp phòng thi: chỉ TO_NHAP_HOSO + ADMIN (phongthi.xepphong)
   { href: '/dashboard/phong-thi', label: 'Xếp phòng thi',          icon: Calendar,        visibleFor: ['ADMIN', 'TO_NHAP_HOSO'] },
   // Nhập điểm: TO_NHAP_DIEM + ADMIN (diemthi.nhap); LANH_DAO chỉ khóa điểm nên vẫn cần xem
