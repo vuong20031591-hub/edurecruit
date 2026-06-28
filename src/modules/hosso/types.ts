@@ -5,10 +5,16 @@
 import type { ThiSinh, ThiSinhCreate, ThiSinhUpdate, TrangThaiHoSo } from '@/db/schema';
 
 export interface ThiSinhView extends ThiSinh {
-  viTri?: { id: number; ma_vi_tri: string; mon: string; cap_hoc: string; loai_vi_tri: string } | null;
+  viTri?: { id: number; ma_vi_tri: string; mon: string; cap_hoc: string; loai_vi_tri: string; diem_chuan: number | null } | null;
   donVi?: { id: number; ma_don_vi: string; ten_don_vi: string; cap_hoc: string } | null;
   diemThi?: { diem_thi_giang: number | null; trang_thai_nhap: string } | null;
   phongThi?: { id: number; ma_phong: string; ngay_thi: string; gio_thi: string } | null;
+  /**
+   * Kết quả xét tuyển (sau khi chạy thuật toán Bước 6-7).
+   * - ket_qua: trạng thái từ bảng KETQUA (Dat/KhongDat/Vang/BoThi/ChoXuLy/KhongDuDieuKien)
+   * - diem_tong: điểm tổng đã tính (diem_thi_giang + diem_uu_tien)
+   */
+  ketQua?: { ket_qua: string; diem_tong: number } | null;
   /**
    * Cờ báo TS đã được xếp phòng (có bản ghi diemthi với phongthi_id).
    * Không lưu trong DB, được join khi cần cho UI.

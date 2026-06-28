@@ -25,15 +25,17 @@ const SORTABLE_COLUMNS = {
 const SELECT_THISINH_VIEW = `
   SELECT
     t.*,
-    v.id  AS vt_id,  v.ma_vi_tri AS vt_ma_vi_tri,  v.mon  AS vt_mon,  v.cap_hoc AS vt_cap_hoc,  v.loai_vi_tri AS vt_loai_vi_tri,
+    v.id  AS vt_id,  v.ma_vi_tri AS vt_ma_vi_tri,  v.mon  AS vt_mon,  v.cap_hoc AS vt_cap_hoc,  v.loai_vi_tri AS vt_loai_vi_tri,  v.diem_chuan AS vt_diem_chuan,
     d.id  AS dv_id,  d.ma_don_vi AS dv_ma_don_vi,  d.ten_don_vi AS dv_ten_don_vi,  d.cap_hoc AS dv_cap_hoc,
     dt.diem_thi_giang  AS dt_diem_thi_giang, dt.trang_thai_nhap AS dt_trang_thai_nhap,
-    p.id  AS pt_id,  p.ma_phong  AS pt_ma_phong,  p.ngay_thi AS pt_ngay_thi, p.gio_thi AS pt_gio_thi
+    p.id  AS pt_id,  p.ma_phong  AS pt_ma_phong,  p.ngay_thi AS pt_ngay_thi, p.gio_thi AS pt_gio_thi,
+    kq.ket_qua AS kq_ket_qua, kq.diem_tong AS kq_diem_tong
   FROM thisinh t
   LEFT JOIN vitri_tuyendung    v  ON v.id  = t.vi_tri_dang_ky_id
   LEFT JOIN don_vi_tuyen_dung  d  ON d.id  = t.don_vi_du_tuyen_id
   LEFT JOIN diemthi            dt ON dt.thisinh_id = t.id
   LEFT JOIN phongthi           p  ON p.id  = dt.phongthi_id
+  LEFT JOIN ketqua             kq ON kq.thisinh_id = t.id
 `;
 
 // ============================================================================
@@ -103,6 +105,7 @@ interface RawThiSinhViewRow {
   vt_mon: string | null;
   vt_cap_hoc: string | null;
   vt_loai_vi_tri: string | null;
+  vt_diem_chuan: number | null;
   dv_id: number | null;
   dv_ma_don_vi: string | null;
   dv_ten_don_vi: string | null;
@@ -113,6 +116,8 @@ interface RawThiSinhViewRow {
   pt_ma_phong: string | null;
   pt_ngay_thi: string | null;
   pt_gio_thi: string | null;
+  kq_ket_qua: string | null;
+  kq_diem_tong: number | null;
 }
 
 function mapRowToView(row: RawThiSinhViewRow): ThiSinhView {
@@ -153,7 +158,7 @@ function mapRowToView(row: RawThiSinhViewRow): ThiSinhView {
     created_by: row.created_by,
     updated_by: row.updated_by,
     viTri: row.vt_id
-      ? { id: row.vt_id, ma_vi_tri: row.vt_ma_vi_tri ?? '', mon: row.vt_mon ?? '', cap_hoc: row.vt_cap_hoc ?? '', loai_vi_tri: row.vt_loai_vi_tri ?? '' }
+      ? { id: row.vt_id, ma_vi_tri: row.vt_ma_vi_tri ?? '', mon: row.vt_mon ?? '', cap_hoc: row.vt_cap_hoc ?? '', loai_vi_tri: row.vt_loai_vi_tri ?? '', diem_chuan: row.vt_diem_chuan ?? null }
       : null,
     donVi: row.dv_id
       ? {
@@ -175,6 +180,10 @@ function mapRowToView(row: RawThiSinhViewRow): ThiSinhView {
           gio_thi: row.pt_gio_thi ?? ''
         }
       : null,
+    ketQua:
+      row.kq_ket_qua !== null || row.kq_diem_tong !== null
+        ? { ket_qua: row.kq_ket_qua ?? '', diem_tong: row.kq_diem_tong ?? 0 }
+        : null,
     da_xep_phong: row.pt_id !== null,
     // Field mới từ migration 0007 — RawThiSinhViewRow dùng SELECT *, nên có sẵn
     ngay_nop_phieu: row.ngay_nop_phieu ?? null,

@@ -9,6 +9,7 @@ import { FilterBar, type ViTriOption, type DonViOption } from './_components/Fil
 import { ThiSinhTable, type ThiSinhAction } from './_components/ThiSinhTable';
 import { Pagination } from './_components/Pagination';
 import type { PaginatedThiSinh, ThiSinhFilter, ThiSinhView } from '@/modules/hosso/types';
+import { TrangThaiHoSoLabel, KetQuaLabel, type TrangThaiHoSoValue } from '@/shared/constants/enums';
 
 const DEFAULT_FILTER: ThiSinhFilter = {
   page: 1,
@@ -303,6 +304,9 @@ export default function HoSoListPage() {
       applyHdr(15, 'Đối tượng\n ưu tiên');
       applyHdr(16, 'Số điện thoại');
       applyHdr(17, 'Đơn vị dự tuyển');
+      applyHdr(18, 'Trạng thái\n hồ sơ');
+      applyHdr(19, 'Trạng thái\n xét tuyển');
+      applyHdr(20, 'Đạt/\nKhông đạt');
 
       // Sub-headers row 9 (chỉ cho cột I-M)
       const applyHdr9 = (col: number, value: string) => {
@@ -325,7 +329,7 @@ export default function HoSoListPage() {
       // Row 10: số thứ tự cột (C10:D10 merge theo file mẫu)
       ws.mergeCells('C10:D10');
       const r10 = ws.getRow(HEADER_ROW + 2);
-      const sttMap: Record<number, number> = {1:1,2:2,3:3,5:4,6:5,7:6,8:7,9:8,10:9,11:10,12:11,13:12,15:13,16:14,17:15};
+      const sttMap: Record<number, number> = {1:1,2:2,3:3,5:4,6:5,7:6,8:7,9:8,10:9,11:10,12:11,13:12,15:13,16:14,17:15,18:16,19:17,20:18};
       Object.entries(sttMap).forEach(([col, val]) => {
         const cell = r10.getCell(Number(col));
         cell.value = val;
@@ -340,6 +344,7 @@ export default function HoSoListPage() {
         1: 5, 2: 5, 3: 14, 4: 8, 5: 13, 6: 8, 7: 8,
         8: 22, 9: 20, 10: 11, 11: 22, 12: 10, 13: 12,
         14: 12, 15: 15, 16: 13, 17: 30,
+        18: 18, 19: 18, 20: 16,
       };
       Object.entries(COL_WIDTHS).forEach(([col, w]) => {
         ws.getColumn(Number(col)).width = w;
@@ -377,11 +382,11 @@ export default function HoSoListPage() {
         globalStt++;
 
         // Group header row
-        ws.mergeCells(`B${currentDataRow}:Q${currentDataRow}`);
+        ws.mergeCells(`B${currentDataRow}:T${currentDataRow}`);
         const groupRow = ws.getRow(currentDataRow);
         groupRow.getCell(1).value = globalStt;
         groupRow.getCell(2).value = groupName;
-        for (let c = 1; c <= 17; c++) {
+        for (let c = 1; c <= 20; c++) {
           const cell = groupRow.getCell(c);
           cell.fill = groupFill;
           cell.font = { bold: true, size: 10 };
@@ -394,6 +399,18 @@ export default function HoSoListPage() {
         // Data rows
         items.forEach((ts, idx) => {
           const row = ws.getRow(currentDataRow);
+          const trangThaiHoSo = (ts.trang_thai_ho_so && typeof ts.trang_thai_ho_so === 'string')
+            ? (TrangThaiHoSoLabel[ts.trang_thai_ho_so as TrangThaiHoSoValue] ?? ts.trang_thai_ho_so)
+            : '';
+          const trangThaiXetTuyen = ts.ketQua?.ket_qua
+            ? (KetQuaLabel[ts.ketQua.ket_qua] ?? ts.ketQua.ket_qua)
+            : '';
+          const diemChuan = ts.viTri?.diem_chuan ?? null;
+          const diemTong = ts.ketQua?.diem_tong ?? null;
+          const datKhongDat = (diemChuan !== null && diemTong !== null)
+            ? (diemTong >= diemChuan ? 'Đạt' : 'Không đạt')
+            : '';
+
           const vals = [
             null,                                  // col1: dành cho STT nhóm
             idx + 1,                               // col2: TT trong nhóm
@@ -412,6 +429,9 @@ export default function HoSoListPage() {
             ts.doi_tuong_uu_tien ?? '',            // col15: Ưu tiên
             ts.dien_thoai ?? '',                   // col16: ĐT
             ts.donVi?.ten_don_vi ?? '',            // col17: Đơn vị
+            trangThaiHoSo,                         // col18: Trạng thái hồ sơ
+            trangThaiXetTuyen,                     // col19: Trạng thái xét tuyển
+            datKhongDat,                           // col20: Đạt/Không đạt
           ];
           vals.forEach((v, i) => {
             const cell = row.getCell(i + 1);
@@ -421,6 +441,9 @@ export default function HoSoListPage() {
             cell.font = { size: 10 };
             if (i + 1 === 2) cell.alignment = { horizontal: 'center' };
             if (i + 1 === 4) cell.alignment = { horizontal: 'left' }; // Tên
+            if (i + 1 === 18 || i + 1 === 19 || i + 1 === 20) {
+              cell.alignment = { horizontal: 'center' };
+            }
           });
           row.height = 16;
           currentDataRow++;
