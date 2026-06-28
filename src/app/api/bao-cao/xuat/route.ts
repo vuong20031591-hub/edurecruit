@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { handleApiError, requirePerm, json } from '@/server/api';
 import { getDb } from '@/db';
 import ExcelJS from 'exceljs';
+import { TrangThaiHoSoLabel, KetQuaLabel, type TrangThaiHoSoValue } from '@/shared/constants/enums';
 
 /**
  * GET /api/bao-cao/xuat?ky_tuyendung_id=X&loai=ds-du-thi|ket-qua-diem|bang-diem-phong
@@ -132,25 +133,57 @@ export async function GET(req: NextRequest) {
         { header: 'Vị trí ĐK', key: 'vi_tri', width: 22 },
         { header: 'Đơn vị dự tuyển', key: 'don_vi', width: 32 },
         { header: 'Phòng thi', key: 'phong', width: 12 },
-        { header: 'Trạng thái', key: 'trang_thai', width: 14 },
+        { header: 'Trạng thái hồ sơ', key: 'trang_thai_hoso', width: 18 },
+        { header: 'Trạng thái xét tuyển', key: 'trang_thai_xettuyen', width: 20 },
+        { header: 'Đạt/Không đạt', key: 'dat_khongdat', width: 16 },
       ];
       styleHeader(ws.getRow(1));
 
       const rows = db.prepare(`
         SELECT t.ma_ho_so, t.sbd, t.ho_ten, t.ngay_sinh, t.gioi_tinh,
           v.mon AS vi_tri, d.ten_don_vi AS don_vi,
-          p.ma_phong AS phong, t.trang_thai_ho_so
+          p.ma_phong AS phong,
+          t.trang_thai_ho_so,
+          kq.ket_qua AS trang_thai_xettuyen,
+          kq.diem_tong AS diem_tong,
+          v.diem_chuan
         FROM thisinh t
         LEFT JOIN vitri_tuyendung v ON v.id = t.vi_tri_dang_ky_id
         LEFT JOIN don_vi_tuyen_dung d ON d.id = t.don_vi_du_tuyen_id
         LEFT JOIN diemthi dt ON dt.thisinh_id = t.id
         LEFT JOIN phongthi p ON p.id = dt.phongthi_id
+        LEFT JOIN ketqua kq ON kq.thisinh_id = t.id
         WHERE t.ky_tuyendung_id = ? AND t.trang_thai_ho_so = 'HopLe'
         ORDER BY v.mon ASC, t.sbd ASC NULLS LAST, t.ho_ten ASC
       `).all(id) as Record<string, unknown>[];
 
       rows.forEach((r, i) => {
-        const row = ws.addRow({ stt: i + 1, ...r });
+        const trangThaiHoSo = (r.trang_thai_ho_so && typeof r.trang_thai_ho_so === 'string')
+          ? (TrangThaiHoSoLabel[r.trang_thai_ho_so as TrangThaiHoSoValue] ?? r.trang_thai_ho_so)
+          : '';
+        const trangThaiXetTuyen = (r.trang_thai_xettuyen && typeof r.trang_thai_xettuyen === 'string')
+          ? (KetQuaLabel[r.trang_thai_xettuyen] ?? r.trang_thai_xettuyen)
+          : '';
+        const diemChuan = typeof r.diem_chuan === 'number' ? r.diem_chuan : null;
+        const diemTong = typeof r.diem_tong === 'number' ? r.diem_tong : null;
+        const datKhongDat = (diemChuan !== null && diemTong !== null)
+          ? (diemTong >= diemChuan ? 'Đạt' : 'Không đạt')
+          : '';
+
+        const row = ws.addRow({
+          stt: i + 1,
+          ma_ho_so: r.ma_ho_so,
+          sbd: r.sbd,
+          ho_ten: r.ho_ten,
+          ngay_sinh: r.ngay_sinh,
+          gioi_tinh: r.gioi_tinh,
+          vi_tri: r.vi_tri,
+          don_vi: r.don_vi,
+          phong: r.phong,
+          trang_thai_hoso: trangThaiHoSo,
+          trang_thai_xettuyen: trangThaiXetTuyen,
+          dat_khongdat: datKhongDat,
+        });
         if (i % 2 === 1) {
           row.eachCell(cell => {
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
