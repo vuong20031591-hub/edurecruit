@@ -18,6 +18,9 @@ export type AuditAction =
   | 'DELETE_THISINH'
   | 'DELETE_BULK_THISINH'
   | 'RA_SOAT_HOSO'
+  | 'RA_SOAT_TU_DONG'
+  | 'APPLY_RA_SOAT'
+  | 'ROLLBACK_RA_SOAT'
   | 'CREATE_VITRI'
   | 'UPDATE_VITRI'
   | 'DELETE_VITRI'
@@ -39,7 +42,8 @@ export type AuditAction =
   | 'USER_UPDATE'
   | 'USER_DELETE'
   | 'USER_RESET_PASSWORD'
-  | 'CONFIG_UPDATE';
+  | 'CONFIG_UPDATE'
+  | 'CONFIG_MON_CHUYEN_NGANH';
 
 export interface AuditLogInput {
   userId?: number | null;

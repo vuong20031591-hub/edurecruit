@@ -6,6 +6,7 @@ import type { Session } from '@/server/auth';
 import { hasPermission } from '@/server/permissions';
 import { audit, type AuditAction } from '@/server/audit';
 import { ConflictError, NotFoundError, UnauthorizedError, ValidationError } from '@/server/api';
+import { getDb } from '@/db';
 import type { ThiSinh, ThiSinhUpdate } from '@/db/schema';
 import { TrangThaiHoSo } from '@/shared/constants/enums';
 import { thisinhCreateSchema } from '@/shared/lib/validation';
@@ -452,6 +453,220 @@ export const hossoService = {
     });
 
     return after;
+  },
+
+  /**
+   * Bulk duyệt tất cả hồ sơ ChoRaSoat trong 1 kỳ → HopLe.
+   * Lấy danh sách TS khớp, update trong transaction; trả về success/failed/errors.
+   */
+  async duyetAllChoRaSoat(
+    kyId: number,
+    session: Session
+  ): Promise<{ success: number; failed: number; errors: Array<{ id: number; message: string }> }> {
+    requirePerm(session, 'hosso.rasoat');
+    const userId = getUserId(session);
+    const dbHandle = getDb();
+
+    const candidates = dbHandle
+      .prepare(`SELECT id, trang_thai_ho_so FROM thisinh WHERE ky_tuyendung_id = ? AND trang_thai_ho_so = 'ChoRaSoat'`)
+      .all(kyId) as Array<{ id: number; trang_thai_ho_so: string }>;
+
+    const update = dbHandle.prepare(`
+      UPDATE thisinh
+      SET trang_thai_ho_so = 'HopLe', updated_by = ?, updated_at = datetime('now')
+      WHERE id = ? AND trang_thai_ho_so = 'ChoRaSoat'
+    `);
+
+    const errors: Array<{ id: number; message: string }> = [];
+    let success = 0;
+
+    dbHandle.transaction(() => {
+      for (const row of candidates) {
+        const r = update.run(userId, row.id);
+        if (r.changes === 1) success++;
+        else errors.push({ id: row.id, message: 'Không thể cập nhật (trạng thái đã thay đổi)' });
+      }
+    })();
+
+    audit({
+      action: 'RA_SOAT_HOSO',
+      userId,
+      username: session.username,
+      resourceType: 'ky_tuyendung',
+      resourceId: kyId,
+      payload: { scope: 'all_cho_ra_soat', success, failed: errors.length, total: candidates.length },
+      result: errors.length === 0 ? 'SUCCESS' : 'FAILURE'
+    });
+
+    return { success, failed: errors.length, errors };
+  },
+
+  /**
+   * Bulk duyệt nhiều hồ sơ theo ids (chỉ ChoRaSoat → HopLe).
+   * Bỏ qua các id không tồn tại hoặc không ở ChoRaSoat; trả về errors.
+   */
+  async bulkDuyet(
+    ids: number[],
+    session: Session
+  ): Promise<{ success: number; failed: number; errors: Array<{ id: number; message: string }> }> {
+    requirePerm(session, 'hosso.rasoat');
+    const userId = getUserId(session);
+    if (ids.length === 0) return { success: 0, failed: 0, errors: [] };
+
+    const dbHandle = getDb();
+    const placeholders = ids.map(() => '?').join(',');
+    const existing = dbHandle
+      .prepare(`SELECT id, trang_thai_ho_so FROM thisinh WHERE id IN (${placeholders})`)
+      .all(...ids) as Array<{ id: number; trang_thai_ho_so: string }>;
+
+    const update = dbHandle.prepare(`
+      UPDATE thisinh
+      SET trang_thai_ho_so = 'HopLe', updated_by = ?, updated_at = datetime('now')
+      WHERE id = ? AND trang_thai_ho_so = 'ChoRaSoat'
+    `);
+
+    const errors: Array<{ id: number; message: string }> = [];
+    let success = 0;
+
+    dbHandle.transaction(() => {
+      for (const id of ids) {
+        const row = existing.find((r) => r.id === id);
+        if (!row) {
+          errors.push({ id, message: `Không tìm thấy thí sinh #${id}` });
+          continue;
+        }
+        if (row.trang_thai_ho_so !== TrangThaiHoSo.ChoRaSoat) {
+          errors.push({ id, message: `Trạng thái hiện tại "${row.trang_thai_ho_so}" không phải Chờ rà soát` });
+          continue;
+        }
+        const r = update.run(userId, id);
+        if (r.changes === 1) success++;
+        else errors.push({ id, message: 'Không thể cập nhật (trạng thái đã thay đổi)' });
+      }
+    })();
+
+    audit({
+      action: 'RA_SOAT_HOSO',
+      userId,
+      username: session.username,
+      resourceType: 'thisinh',
+      payload: { scope: 'bulk_duyet', success, failed: errors.length, ids },
+      result: errors.length === 0 ? 'SUCCESS' : 'FAILURE'
+    });
+
+    return { success, failed: errors.length, errors };
+  },
+
+  /**
+   * Bulk khóa tất cả hồ sơ HopLe + chưa khóa trong 1 kỳ.
+   * Pre-check: không còn ChoRaSoat nào (giống lockAllHopLe).
+   */
+  async khoaAllHopLe(
+    kyId: number,
+    session: Session
+  ): Promise<{ success: number; failed: number; errors: Array<{ id: number; message: string }> }> {
+    requirePerm(session, 'hosso.khoa');
+    const userId = getUserId(session);
+
+    const byStatus = hossoRepository.countByStatus(kyId);
+    const choRaSoat = byStatus.ChoRaSoat ?? 0;
+    if (choRaSoat > 0) {
+      throw new ValidationError(`Vẫn còn ${choRaSoat} hồ sơ chờ rà soát`);
+    }
+
+    const dbHandle = getDb();
+    const candidates = dbHandle
+      .prepare(`SELECT id, trang_thai_ho_so, is_profile_locked FROM thisinh WHERE ky_tuyendung_id = ? AND trang_thai_ho_so = 'HopLe' AND is_profile_locked = 0`)
+      .all(kyId) as Array<{ id: number; trang_thai_ho_so: number; is_profile_locked: number }>;
+
+    const lock = dbHandle.prepare(`
+      UPDATE thisinh
+      SET is_profile_locked = 1, locked_at = datetime('now'), locked_by = ?, updated_by = ?, updated_at = datetime('now')
+      WHERE id = ? AND trang_thai_ho_so = 'HopLe' AND is_profile_locked = 0
+    `);
+
+    const errors: Array<{ id: number; message: string }> = [];
+    let success = 0;
+
+    dbHandle.transaction(() => {
+      for (const row of candidates) {
+        const r = lock.run(userId, userId, row.id);
+        if (r.changes === 1) success++;
+        else errors.push({ id: row.id, message: 'Không thể khóa (trạng thái đã thay đổi)' });
+      }
+    })();
+
+    audit({
+      action: 'KHOA_HO_SO',
+      userId,
+      username: session.username,
+      resourceType: 'ky_tuyendung',
+      resourceId: kyId,
+      payload: { scope: 'all_hop_le', success, failed: errors.length, total: candidates.length, by_status: byStatus },
+      result: errors.length === 0 ? 'SUCCESS' : 'FAILURE'
+    });
+
+    return { success, failed: errors.length, errors };
+  },
+
+  /**
+   * Bulk khóa nhiều hồ sơ theo ids (chỉ HopLe + chưa khóa).
+   * Trả về errors cho id không khớp điều kiện.
+   */
+  async bulkKhoa(
+    ids: number[],
+    session: Session
+  ): Promise<{ success: number; failed: number; errors: Array<{ id: number; message: string }> }> {
+    requirePerm(session, 'hosso.khoa');
+    const userId = getUserId(session);
+    if (ids.length === 0) return { success: 0, failed: 0, errors: [] };
+
+    const dbHandle = getDb();
+    const placeholders = ids.map(() => '?').join(',');
+    const existing = dbHandle
+      .prepare(`SELECT id, trang_thai_ho_so, is_profile_locked FROM thisinh WHERE id IN (${placeholders})`)
+      .all(...ids) as Array<{ id: number; trang_thai_ho_so: string; is_profile_locked: number }>;
+
+    const lock = dbHandle.prepare(`
+      UPDATE thisinh
+      SET is_profile_locked = 1, locked_at = datetime('now'), locked_by = ?, updated_by = ?, updated_at = datetime('now')
+      WHERE id = ? AND trang_thai_ho_so = 'HopLe' AND is_profile_locked = 0
+    `);
+
+    const errors: Array<{ id: number; message: string }> = [];
+    let success = 0;
+
+    dbHandle.transaction(() => {
+      for (const id of ids) {
+        const row = existing.find((r) => r.id === id);
+        if (!row) {
+          errors.push({ id, message: `Không tìm thấy thí sinh #${id}` });
+          continue;
+        }
+        if (row.is_profile_locked === 1) {
+          errors.push({ id, message: 'Hồ sơ đã được khóa trước đó' });
+          continue;
+        }
+        if (row.trang_thai_ho_so !== TrangThaiHoSo.HopLe) {
+          errors.push({ id, message: `Chỉ được khóa hồ sơ Hợp lệ (hiện tại: "${row.trang_thai_ho_so}")` });
+          continue;
+        }
+        const r = lock.run(userId, userId, id);
+        if (r.changes === 1) success++;
+        else errors.push({ id, message: 'Không thể khóa (trạng thái đã thay đổi)' });
+      }
+    })();
+
+    audit({
+      action: 'KHOA_HO_SO',
+      userId,
+      username: session.username,
+      resourceType: 'thisinh',
+      payload: { scope: 'bulk_khoa', success, failed: errors.length, ids },
+      result: errors.length === 0 ? 'SUCCESS' : 'FAILURE'
+    });
+
+    return { success, failed: errors.length, errors };
   },
 
   async importFromExcel(

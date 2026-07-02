@@ -5,7 +5,7 @@
 import type { Quyen } from '@/db/schema';
 
 export type Permission =
-  | 'hosso.view' | 'hosso.create' | 'hosso.update' | 'hosso.delete' | 'hosso.rasoat' | 'hosso.khoa'
+  | 'hosso.view' | 'hosso.create' | 'hosso.update' | 'hosso.delete' | 'hosso.rasoat' | 'hosso.khoa' | 'hosso.cauhinh'
   | 'vitri.view' | 'vitri.create' | 'vitri.update' | 'vitri.delete'
   | 'donvi.view' | 'donvi.create' | 'donvi.update' | 'donvi.delete'
   | 'phongthi.view' | 'phongthi.create' | 'phongthi.update' | 'phongthi.xepphong' | 'phongthi.khoa'
@@ -20,7 +20,7 @@ export type Permission =
 
 const ROLE_PERMISSIONS: Record<Quyen, Permission[]> = {
   ADMIN: [
-    'hosso.view','hosso.create','hosso.update','hosso.delete','hosso.rasoat','hosso.khoa',
+    'hosso.view','hosso.create','hosso.update','hosso.delete','hosso.rasoat','hosso.khoa','hosso.cauhinh',
     'vitri.view','vitri.create','vitri.update','vitri.delete',
     'donvi.view','donvi.create','donvi.update','donvi.delete',
     'phongthi.view','phongthi.create','phongthi.update','phongthi.xepphong','phongthi.khoa',

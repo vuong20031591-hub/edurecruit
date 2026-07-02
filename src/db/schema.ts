@@ -5,6 +5,7 @@
  */
 
 export type TrangThaiHoSo = 'ChoRaSoat' | 'HopLe' | 'CanBoSung' | 'KhongDuDieuKien' | 'DaChinhSua';
+export type TrangThaiRaSoat = 'Dat' | 'CanhBao' | 'KhongDat';
 export type TrangThaiDiem = 'ChuaNhap' | 'DaNhap' | 'DaKhoa';
 export type TrangThaiPhongThi = 'ChuaSapXep' | 'DaSapXep' | 'DaKhoa' | 'DaThiXong';
 export type TrangThaiKy = 'Mo' | 'DangTuyen' | 'DaKhoa' | 'Huy';
@@ -193,6 +194,18 @@ export interface ThiSinhQtc {
   tu_ngay: string | null;
   den_ngay: string | null;
   co_quan: string | null;
+  created_at: string;
+}
+
+export interface RaSoatKetQua {
+  id: number;
+  thisinh_id: number;
+  ky_tuyendung_id: number;
+  trang_thai: TrangThaiRaSoat;
+  diem_uu_tien: number;
+  ly_do: string;
+  ngay_ra_soat: string;
+  nguoi_ra_soat: number | null;
   created_at: string;
 }
 
