@@ -4,6 +4,8 @@ import { donviService } from '@/modules/donvi/service';
 import type { DonViFilter } from '@/modules/donvi/types';
 import type { CapHoc } from '@/db/schema';
 
+export const dynamic = 'force-dynamic';
+
 const VALID_CAP_HOC: CapHoc[] = ['MN', 'TH', 'THCS', 'THPT', 'GDTX', 'DNTTHPT'];
 
 export async function GET(req: NextRequest) {

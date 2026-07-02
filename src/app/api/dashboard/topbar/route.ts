@@ -7,6 +7,8 @@ import { NextRequest } from 'next/server';
 import { getDb } from '@/db';
 import { handleApiError, json, requireAuth } from '@/server/api';
 
+export const dynamic = 'force-dynamic';
+
 export interface TopbarData {
   ky: {
     id: number;

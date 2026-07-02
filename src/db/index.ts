@@ -62,6 +62,9 @@ function applyPragmas(db: Database.Database): void {
   db.pragma('synchronous = NORMAL');
   db.pragma('temp_store = MEMORY');
   db.pragma('busy_timeout = 5000');
+  db.pragma('cache_size = -64000');
+  db.pragma('mmap_size = 268435456');
+  db.pragma('wal_autocheckpoint = 1000');
 }
 
 export function getDb(): Database.Database {

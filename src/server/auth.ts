@@ -38,15 +38,43 @@ export async function signSession(payload: SessionPayload): Promise<string> {
     .sign(getSecret());
 }
 
+const _verifyCache = new Map<string, { session: Session; expiresAt: number }>();
+const VERIFY_CACHE_TTL_MS = 60_000;
+const VERIFY_CACHE_MAX = 500;
+
+function cacheSession(token: string, session: Session): void {
+  if (_verifyCache.size >= VERIFY_CACHE_MAX) {
+    const firstKey = _verifyCache.keys().next().value;
+    if (firstKey) _verifyCache.delete(firstKey);
+  }
+  _verifyCache.set(token, {
+    session,
+    expiresAt: Date.now() + VERIFY_CACHE_TTL_MS
+  });
+}
+
 export async function verifySession(token: string): Promise<Session | null> {
+  const cached = _verifyCache.get(token);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.session;
+  }
+
   try {
     const { payload } = await jwtVerify(token, getSecret(), {
       issuer: 'edurecruit'
     });
-    return payload as unknown as Session;
+    const session = payload as unknown as Session;
+    if (session.exp * 1000 > Date.now()) {
+      cacheSession(token, session);
+    }
+    return session;
   } catch {
     return null;
   }
+}
+
+export function clearVerifyCache(): void {
+  _verifyCache.clear();
 }
 
 // ============================================================================

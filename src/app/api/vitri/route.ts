@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server';
 import { handleApiError, requireAuth, requirePerm, json } from '@/server/api';
 import { vitriService } from '@/modules/vitri/service';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const session = await requireAuth(req);

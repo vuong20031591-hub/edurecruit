@@ -470,17 +470,23 @@ export const hossoService = {
     const errors: ImportExcelResult['errors'] = [];
     let success = 0;
 
+    // Phase 1: Validate tất cả rows, gom các row pass validate
+    type ValidatedRow = { rawRow: Record<string, unknown>; rowNum: number; valid: NonNullable<ReturnType<typeof validateImportRow>>['valid']; viTri2Id: number | null; donVi2Id: number | null };
+    const validatedRows: ValidatedRow[] = [];
     rows.forEach((rawRow, index) => {
       const rowNum = index + 1;
-      try {
-        const validated = validateImportRow(rawRow, rowNum, kyId, vitriList, donViList, format);
-        if (validated.status === 'error') {
-          errors.push({ row: rowNum, message: validated.message ?? 'Lỗi không xác định' });
-          return;
-        }
-        const { valid, viTri2Id, donVi2Id } = validated;
+      const validated = validateImportRow(rawRow, rowNum, kyId, vitriList, donViList, format);
+      if (validated.status === 'error') {
+        errors.push({ row: rowNum, message: validated.message ?? 'Lỗi không xác định' });
+        return;
+      }
+      validatedRows.push({ rawRow, rowNum, valid: validated.valid, viTri2Id: validated.viTri2Id, donVi2Id: validated.donVi2Id });
+    });
 
-        const rawR = rawRow as Record<string, unknown>;
+    // Phase 2: Insert các row đã validate trong transaction (atomic)
+    const dbHandle = getDb();
+    dbHandle.transaction(() => {
+      for (const { rawRow, valid, viTri2Id, donVi2Id } of validatedRows) {
         const created = hossoRepository.create({
           ...(valid as unknown as Record<string, unknown>),
           gioi_tinh: normalizeGioiTinh(valid.gioi_tinh),
@@ -498,22 +504,22 @@ export const hossoService = {
           ly_do_tu_choi: null,
           created_by: userId,
           // Field mới từ migration 0007
-          ngay_nop_phieu: (rawR.ngay_nop_phieu as string | null) ?? null,
-          ton_giao: (rawR.ton_giao as string | null) ?? null,
-          suc_khoe: (rawR.suc_khoe as string | null) ?? null,
-          chieu_cao: (rawR.chieu_cao as string | null) ?? null,
-          can_nang: (rawR.can_nang as string | null) ?? null,
-          cho_o_hien_nay: (rawR.cho_o_hien_nay as string | null) ?? null,
-          trinh_do_van_hoa: (rawR.trinh_do_van_hoa as string | null) ?? null,
-          so_hieu_van_bang: (rawR.so_hieu_van_bang as string | null) ?? null,
-          hinh_thuc_dao_tao: (rawR.hinh_thuc_dao_tao as string | null) ?? null,
-          nganh_dao_tao: (rawR.nganh_dao_tao as string | null) ?? null,
-          ngay_cap_van_bang: (rawR.ngay_cap_van_bang as string | null) ?? null,
-          ngoai_ngu: (rawR.ngoai_ngu as string | null) ?? null,
-          ngoai_ngu_khac: (rawR.ngoai_ngu_khac as string | null) ?? null,
-          mien_thi_nn: (rawR.mien_thi_nn as string | null) ?? null,
-          cam_doan_thong_tin: (rawR.cam_doan_thong_tin as string | null) ?? null,
-          co_dang_ky_nv2: (rawR.co_dang_ky_nv2 as number) ?? 0,
+          ngay_nop_phieu: (rawRow.ngay_nop_phieu as string | null) ?? null,
+          ton_giao: (rawRow.ton_giao as string | null) ?? null,
+          suc_khoe: (rawRow.suc_khoe as string | null) ?? null,
+          chieu_cao: (rawRow.chieu_cao as string | null) ?? null,
+          can_nang: (rawRow.can_nang as string | null) ?? null,
+          cho_o_hien_nay: (rawRow.cho_o_hien_nay as string | null) ?? null,
+          trinh_do_van_hoa: (rawRow.trinh_do_van_hoa as string | null) ?? null,
+          so_hieu_van_bang: (rawRow.so_hieu_van_bang as string | null) ?? null,
+          hinh_thuc_dao_tao: (rawRow.hinh_thuc_dao_tao as string | null) ?? null,
+          nganh_dao_tao: (rawRow.nganh_dao_tao as string | null) ?? null,
+          ngay_cap_van_bang: (rawRow.ngay_cap_van_bang as string | null) ?? null,
+          ngoai_ngu: (rawRow.ngoai_ngu as string | null) ?? null,
+          ngoai_ngu_khac: (rawRow.ngoai_ngu_khac as string | null) ?? null,
+          mien_thi_nn: (rawRow.mien_thi_nn as string | null) ?? null,
+          camdoan_thong_tin: (rawRow.camdoan_thong_tin as string | null) ?? null,
+          co_dang_ky_nv2: (rawRow.co_dang_ky_nv2 as number) ?? 0,
           vi_tri_dang_ky_id_2: viTri2Id,
           don_vi_du_tuyen_id_2: donVi2Id
         });
@@ -521,15 +527,12 @@ export const hossoService = {
 
         // Insert bảng phụ (chỉ với format Google Form — ds-du-thi không có dữ liệu)
         if (format === 'google-form') {
-          insertChildTables(created.id, rawR);
+          insertChildTables(created.id, rawRow);
         }
         // gắn id vào row để caller debug
-        rawR.__imported_id = created.id;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Lỗi không xác định';
-        errors.push({ row: rowNum, message: msg });
+        rawRow.__imported_id = created.id;
       }
-    });
+    })();
 
     const meta = baseMeta(session, 'thisinh', undefined);
     audit({

@@ -6,6 +6,8 @@ import { NextRequest } from 'next/server';
 import { handleApiError, requireAuth, json } from '@/server/api';
 import { authService } from '@/modules/auth/service';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const session = await requireAuth(req);

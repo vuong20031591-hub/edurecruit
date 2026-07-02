@@ -4,6 +4,8 @@ import { hossoService } from '@/modules/hosso/service';
 import type { ThiSinhFilter } from '@/modules/hosso/types';
 import type { ThiSinhCreate } from '@/db/schema';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const session = await requirePerm(req, 'hosso.view');
