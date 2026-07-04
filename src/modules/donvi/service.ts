@@ -61,6 +61,12 @@ function validatePayload(input: DonViCreateInput, partial = false): void {
       throw new ValidationError('cap_hoc không hợp lệ');
     }
   }
+  if (!partial || input.so_chi_tieu !== undefined) {
+    const v = input.so_chi_tieu ?? 0;
+    if (!Number.isInteger(v) || v < 0) {
+      throw new ValidationError('so_chi_tieu phải là số nguyên không âm');
+    }
+  }
   if (input.so_dien_thoai != null && input.so_dien_thoai !== '') {
     const phone = input.so_dien_thoai.replace(/[\s.-]/g, '');
     if (!/^\+?\d{9,12}$/.test(phone)) {
@@ -111,7 +117,8 @@ export const donviService = {
         dia_chi: input.dia_chi ?? null,
         so_dien_thoai: input.so_dien_thoai ?? null,
         nguoi_lien_he: input.nguoi_lien_he ?? null,
-        ghi_chu: input.ghi_chu ?? null
+        ghi_chu: input.ghi_chu ?? null,
+        so_chi_tieu: input.so_chi_tieu ?? 0
       });
       audit({
         action: toAudit('CREATE_DONVI'),
@@ -162,6 +169,7 @@ export const donviService = {
     if (input.so_dien_thoai !== undefined) patch.so_dien_thoai = input.so_dien_thoai ?? null;
     if (input.nguoi_lien_he !== undefined) patch.nguoi_lien_he = input.nguoi_lien_he ?? null;
     if (input.ghi_chu !== undefined) patch.ghi_chu = input.ghi_chu ?? null;
+    if (input.so_chi_tieu !== undefined) patch.so_chi_tieu = input.so_chi_tieu ?? 0;
 
     try {
       const updated = donviRepository.update(id, patch);

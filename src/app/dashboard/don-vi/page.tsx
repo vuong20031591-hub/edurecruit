@@ -267,6 +267,8 @@ export default function DonViPage() {
                       </span>
                       <span>·</span>
                       <span>{dv.soViTri} vị trí</span>
+                      <span>·</span>
+                      <span>Chỉ tiêu: {dv.so_chi_tieu}</span>
                     </div>
 
                     <div
@@ -302,6 +304,7 @@ export default function DonViPage() {
                     <TH className="w-32">Mã ĐV</TH>
                     <TH>Tên đơn vị</TH>
                     <TH className="w-40">Cấp học</TH>
+                    <TH className="w-24 text-right">Chỉ tiêu</TH>
                     <TH className="w-20 text-right">Số TS</TH>
                     <TH className="w-24 text-right">Số vị trí</TH>
                     <TH className="w-24 text-right">Thao tác</TH>
@@ -319,6 +322,7 @@ export default function DonViPage() {
                         )}
                       </TD>
                       <TD className="text-slate-700">{CapHocLabel[dv.cap_hoc] ?? dv.cap_hoc}</TD>
+                      <TD className="text-right font-mono text-sm">{dv.so_chi_tieu ?? 0}</TD>
                       <TD className="text-right font-mono text-sm">{dv.soThiSinh}</TD>
                       <TD className="text-right font-mono text-sm">{dv.soViTri}</TD>
                       <TD>

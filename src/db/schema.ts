@@ -88,6 +88,7 @@ export interface DonViTuyenDung {
   so_dien_thoai: string | null;
   nguoi_lien_he: string | null;
   ghi_chu: string | null;
+  so_chi_tieu: number;
   created_at: string;
   updated_at: string;
 }

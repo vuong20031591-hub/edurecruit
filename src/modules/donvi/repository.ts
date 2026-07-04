@@ -85,8 +85,8 @@ export const donviRepository = {
     const stmt = getDb().prepare(`
       INSERT INTO don_vi_tuyen_dung (
         ky_tuyendung_id, ma_don_vi, ten_don_vi, cap_hoc,
-        dia_chi, so_dien_thoai, nguoi_lien_he, ghi_chu
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        dia_chi, so_dien_thoai, nguoi_lien_he, ghi_chu, so_chi_tieu
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const info = stmt.run(
       data.ky_tuyendung_id,
@@ -96,7 +96,8 @@ export const donviRepository = {
       data.dia_chi ?? null,
       data.so_dien_thoai ?? null,
       data.nguoi_lien_he ?? null,
-      data.ghi_chu ?? null
+      data.ghi_chu ?? null,
+      data.so_chi_tieu ?? 0
     );
     return this.findById(Number(info.lastInsertRowid))!;
   },
@@ -111,7 +112,8 @@ export const donviRepository = {
       dia_chi: 'dia_chi',
       so_dien_thoai: 'so_dien_thoai',
       nguoi_lien_he: 'nguoi_lien_he',
-      ghi_chu: 'ghi_chu'
+      ghi_chu: 'ghi_chu',
+      so_chi_tieu: 'so_chi_tieu'
     };
     for (const key of Object.keys(map)) {
       const k = key as keyof DonViTuyenDung;

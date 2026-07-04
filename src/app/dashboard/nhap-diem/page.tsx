@@ -13,12 +13,6 @@ interface PhongOption { id: number; ma_phong: string; ten_phong: string | null; 
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function maskName(row: DiemThiView): string {
-  // Ẩn danh: giữ chữ đầu tên + ***
-  const first = row.ten?.charAt(0) ?? '';
-  const ho = row.ho ?? '';
-  return `${ho} ${first}***`;
-}
 
 function calcDTB(gk1: number | null, gk2: number | null): number | null {
   // Đồng nhất với DB trigger: chỉ tính khi cả 2 NOT NULL
@@ -320,7 +314,7 @@ export default function NhapDiemPage() {
           diem_gk1: r.diem_gk1 ?? '',
           diem_gk2: r.diem_gk2 ?? '',
           dtb: dtb ?? '',
-          trang_thai: r.trang_thai_nhap,
+          trang_thai: statusBadge(r).label,
         });
       });
 
@@ -483,7 +477,7 @@ export default function NhapDiemPage() {
                       <span className="inline-flex items-center rounded px-2 py-0.5 bg-[#1d293d] text-slate-200 text-xs font-bold font-mono">
                         {row.sbd ?? row.thisinh_id}
                       </span>
-                      <span className="text-sm text-slate-600 truncate">{maskName(row)}</span>
+                      <span className="text-sm text-slate-600 truncate">{row.ho_ten}</span>
                       <span className={cn('ml-auto inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs whitespace-nowrap', badge.cls)}>
                         {badge.label}
                       </span>
@@ -606,7 +600,7 @@ export default function NhapDiemPage() {
               </div>
               <div className="px-4 py-3">
                 <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Họ và Tên</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">(Ẩn danh)</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">Theo danh sách phòng thi</div>
               </div>
               <div className="px-4 py-3">
                 <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Điểm GK 1</div>
@@ -661,7 +655,7 @@ export default function NhapDiemPage() {
 
                   {/* Tên ẩn danh */}
                   <div className="px-4 py-3 flex items-center">
-                    <span className="text-sm text-slate-600">{maskName(row)}</span>
+                    <span className="text-sm text-slate-600">{row.ho_ten}</span>
                   </div>
 
                   {/* GK1 */}

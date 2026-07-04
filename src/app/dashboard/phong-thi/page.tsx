@@ -119,8 +119,8 @@ export default function PhongThiPage() {
   useEffect(() => {
     if (openMenuId === null) return;
     const handler = () => setOpenMenuId(null);
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
   }, [openMenuId]);
 
   async function runSapXep() {
@@ -532,7 +532,7 @@ function TableView({
                     {openMenuId === r.id && (
                       <div
                         className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md"
-                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
                       >
                         <a href={`/dashboard/nhap-diem?phongthi_id=${r.id}`}
                           className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">

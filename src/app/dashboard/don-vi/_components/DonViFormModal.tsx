@@ -23,6 +23,7 @@ interface FormState {
   so_dien_thoai: string;
   nguoi_lien_he: string;
   ghi_chu: string;
+  so_chi_tieu: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -32,7 +33,8 @@ const EMPTY_FORM: FormState = {
   dia_chi: '',
   so_dien_thoai: '',
   nguoi_lien_he: '',
-  ghi_chu: ''
+  ghi_chu: '',
+  so_chi_tieu: '0'
 };
 
 const CAP_HOC_OPTIONS: { value: CapHocType; label: string }[] = (Object.keys(CapHoc) as CapHocType[]).map((k) => ({
@@ -56,7 +58,8 @@ export function DonViFormModal({ open, onOpenChange, kyId, editing, onSaved }: D
           dia_chi: editing.dia_chi ?? '',
           so_dien_thoai: editing.so_dien_thoai ?? '',
           nguoi_lien_he: editing.nguoi_lien_he ?? '',
-          ghi_chu: editing.ghi_chu ?? ''
+          ghi_chu: editing.ghi_chu ?? '',
+          so_chi_tieu: String(editing.so_chi_tieu ?? 0)
         });
       } else {
         setForm(EMPTY_FORM);
@@ -100,7 +103,8 @@ export function DonViFormModal({ open, onOpenChange, kyId, editing, onSaved }: D
         dia_chi: form.dia_chi.trim() || null,
         so_dien_thoai: form.so_dien_thoai.trim() || null,
         nguoi_lien_he: form.nguoi_lien_he.trim() || null,
-        ghi_chu: form.ghi_chu.trim() || null
+        ghi_chu: form.ghi_chu.trim() || null,
+        so_chi_tieu: Number(form.so_chi_tieu) || 0
       };
 
       const url = isEdit ? `/api/donvi/${editing!.id}` : '/api/donvi';
@@ -196,7 +200,17 @@ export function DonViFormModal({ open, onOpenChange, kyId, editing, onSaved }: D
               placeholder="Số nhà, đường, phường/xã, tỉnh"
             />
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Input
+                label="Số chỉ tiêu"
+                type="number"
+                min={0}
+                value={form.so_chi_tieu}
+                onChange={(e) => update('so_chi_tieu', e.target.value)}
+                error={errors.so_chi_tieu}
+                placeholder="0"
+                inputMode="numeric"
+              />
               <Input
                 label="Số điện thoại"
                 value={form.so_dien_thoai}
