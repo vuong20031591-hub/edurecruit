@@ -1,8 +1,9 @@
-﻿/**
+/**
  * donvi module - service
  * File: src/modules/donvi/service.ts
  */
 import { donviRepository } from './repository';
+import { getDb } from '@/db';
 import { audit, type AuditAction } from '@/server/audit';
 import {
   ConflictError,
@@ -56,7 +57,7 @@ function validatePayload(input: DonViCreateInput, partial = false): void {
     }
   }
   if (!partial || input.cap_hoc !== undefined) {
-    const allowed = ['MN', 'TH', 'THCS', 'THPT', 'GDTX', 'DNTTHPT'] as const;
+    const allowed = ['MN', 'TH', 'THCS', 'THPT', 'GDTX', 'DNTTHPT', 'THCS_THPT', 'TH_THCS'] as const;
     if (!allowed.includes(input.cap_hoc as typeof allowed[number])) {
       throw new ValidationError('cap_hoc không hợp lệ');
     }
@@ -65,6 +66,19 @@ function validatePayload(input: DonViCreateInput, partial = false): void {
     const v = input.so_chi_tieu ?? 0;
     if (!Number.isInteger(v) || v < 0) {
       throw new ValidationError('so_chi_tieu phải là số nguyên không âm');
+    }
+  }
+  if (input.mappings !== undefined) {
+    if (!Array.isArray(input.mappings)) {
+      throw new ValidationError('mappings phải là một mảng');
+    }
+    for (const m of input.mappings) {
+      if (!Number.isInteger(m.vitri_tuyendung_id) || m.vitri_tuyendung_id <= 0) {
+        throw new ValidationError('vitri_tuyendung_id không hợp lệ');
+      }
+      if (!Number.isInteger(m.so_luong_phan_bo) || m.so_luong_phan_bo < 0) {
+        throw new ValidationError('so_luong_phan_bo phải là số nguyên không âm');
+      }
     }
   }
   if (input.so_dien_thoai != null && input.so_dien_thoai !== '') {
@@ -87,7 +101,10 @@ export const donviService = {
     const dv = donviRepository.findById(id);
     if (!dv) throw new NotFoundError(`Đơn vị #${id} không tồn tại`);
     const soThiSinh = donviRepository.countThiSinh(id);
-    return { ...dv, soThiSinh, soViTri: 0 };
+    const mappings = getDb().prepare(
+      'SELECT vitri_tuyendung_id, so_luong_phan_bo FROM vitri_donvi WHERE don_vi_tuyen_dung_id = ?'
+    ).all(id) as Array<{ vitri_tuyendung_id: number; so_luong_phan_bo: number }>;
+    return { ...dv, soThiSinh, mappings };
   },
 
   async listAllByKy(kyId: number, _session?: Session | null): Promise<DonViTuyenDung[]> {
@@ -108,27 +125,43 @@ export const donviService = {
     }
 
     const a = actor(session);
+    const db = getDb();
+    
+    // Tự động tính tổng chỉ tiêu nếu có mappings
+    let soChiTieu = input.so_chi_tieu ?? 0;
+    if (input.mappings) {
+      soChiTieu = input.mappings.reduce((sum, m) => sum + m.so_luong_phan_bo, 0);
+    }
+
     try {
-      const created = donviRepository.create({
-        ky_tuyendung_id: input.ky_tuyendung_id,
-        ma_don_vi: input.ma_don_vi.trim(),
-        ten_don_vi: input.ten_don_vi.trim(),
-        cap_hoc: input.cap_hoc,
-        dia_chi: input.dia_chi ?? null,
-        so_dien_thoai: input.so_dien_thoai ?? null,
-        nguoi_lien_he: input.nguoi_lien_he ?? null,
-        ghi_chu: input.ghi_chu ?? null,
-        so_chi_tieu: input.so_chi_tieu ?? 0
+      let created: DonViTuyenDung;
+      const txn = db.transaction(() => {
+        created = donviRepository.create({
+          ky_tuyendung_id: input.ky_tuyendung_id,
+          ma_don_vi: input.ma_don_vi.trim(),
+          ten_don_vi: input.ten_don_vi.trim(),
+          cap_hoc: input.cap_hoc,
+          dia_chi: input.dia_chi ?? null,
+          so_dien_thoai: input.so_dien_thoai ?? null,
+          nguoi_lien_he: input.nguoi_lien_he ?? null,
+          ghi_chu: input.ghi_chu ?? null,
+          so_chi_tieu: soChiTieu
+        });
+        if (input.mappings) {
+          donviRepository.replaceMapping(created.id, input.mappings);
+        }
       });
+      txn();
+
       audit({
         action: toAudit('CREATE_DONVI'),
         userId: a.userId,
         username: a.username,
         resourceType: 'don_vi_tuyen_dung',
-        resourceId: created.id,
-        payload: { ma_don_vi: created.ma_don_vi, ten_don_vi: created.ten_don_vi }
+        resourceId: created!.id,
+        payload: { ma_don_vi: created!.ma_don_vi, ten_don_vi: created!.ten_don_vi }
       });
-      return { ...created, soThiSinh: 0, soViTri: 0 };
+      return { ...created!, soThiSinh: 0, mappings: input.mappings };
     } catch (err) {
       audit({
         action: toAudit('CREATE_DONVI'),
@@ -161,6 +194,14 @@ export const donviService = {
     }
 
     const a = actor(session);
+    const db = getDb();
+    
+    // Tự động tính tổng chỉ tiêu nếu có mappings
+    let soChiTieu = input.so_chi_tieu !== undefined ? input.so_chi_tieu : current.so_chi_tieu;
+    if (input.mappings) {
+      soChiTieu = input.mappings.reduce((sum, m) => sum + m.so_luong_phan_bo, 0);
+    }
+
     const patch: Partial<DonViTuyenDung> = {};
     if (input.ma_don_vi !== undefined) patch.ma_don_vi = input.ma_don_vi.trim();
     if (input.ten_don_vi !== undefined) patch.ten_don_vi = input.ten_don_vi.trim();
@@ -169,10 +210,18 @@ export const donviService = {
     if (input.so_dien_thoai !== undefined) patch.so_dien_thoai = input.so_dien_thoai ?? null;
     if (input.nguoi_lien_he !== undefined) patch.nguoi_lien_he = input.nguoi_lien_he ?? null;
     if (input.ghi_chu !== undefined) patch.ghi_chu = input.ghi_chu ?? null;
-    if (input.so_chi_tieu !== undefined) patch.so_chi_tieu = input.so_chi_tieu ?? 0;
+    patch.so_chi_tieu = soChiTieu;
 
     try {
-      const updated = donviRepository.update(id, patch);
+      let updated: DonViTuyenDung | null = null;
+      const txn = db.transaction(() => {
+        updated = donviRepository.update(id, patch);
+        if (input.mappings) {
+          donviRepository.replaceMapping(id, input.mappings);
+        }
+      });
+      txn();
+
       audit({
         action: toAudit('UPDATE_DONVI'),
         userId: a.userId,
@@ -182,7 +231,7 @@ export const donviService = {
         payload: { before: current, after: updated }
       });
       const soThiSinh = donviRepository.countThiSinh(id);
-      return { ...(updated as DonViTuyenDung), soThiSinh, soViTri: 0 };
+      return { ...(updated as unknown as DonViTuyenDung), soThiSinh, mappings: input.mappings };
     } catch (err) {
       audit({
         action: toAudit('UPDATE_DONVI'),

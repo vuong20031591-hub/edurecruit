@@ -26,6 +26,13 @@ interface FormState {
   so_chi_tieu: string;
 }
 
+interface ViTriOption {
+  id: number;
+  ma_vi_tri: string;
+  mon: string;
+  cap_hoc: CapHocType;
+}
+
 const EMPTY_FORM: FormState = {
   ma_don_vi: '',
   ten_don_vi: '',
@@ -48,9 +55,36 @@ export function DonViFormModal({ open, onOpenChange, kyId, editing, onSaved }: D
   const [submitting, setSubmitting] = useState(false);
   const isEdit = !!editing;
 
+  const [allViTri, setAllViTri] = useState<ViTriOption[]>([]);
+  const [subjectTargets, setSubjectTargets] = useState<Record<number, number>>({});
+
   useEffect(() => {
     if (open) {
+      if (kyId) {
+        fetch(`/api/vitri?all=true&ky_tuyendung_id=${kyId}`)
+          .then((res) => res.json())
+          .then((resData) => {
+            const list = resData && Array.isArray(resData.data) ? resData.data : [];
+            setAllViTri(list);
+          })
+          .catch((err) => console.error('Lỗi khi tải danh sách vị trí:', err));
+      }
+
       if (editing) {
+        // Tải chi tiết đơn vị để lấy mappings
+        fetch(`/api/donvi/${editing.id}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data && Array.isArray(data.mappings)) {
+              const targets: Record<number, number> = {};
+              data.mappings.forEach((m: { vitri_tuyendung_id: number; so_luong_phan_bo: number }) => {
+                targets[m.vitri_tuyendung_id] = m.so_luong_phan_bo;
+              });
+              setSubjectTargets(targets);
+            }
+          })
+          .catch((err) => console.error('Lỗi khi tải chi tiết đơn vị:', err));
+
         setForm({
           ma_don_vi: editing.ma_don_vi,
           ten_don_vi: editing.ten_don_vi,
@@ -63,16 +97,45 @@ export function DonViFormModal({ open, onOpenChange, kyId, editing, onSaved }: D
         });
       } else {
         setForm(EMPTY_FORM);
+        setSubjectTargets({});
       }
       setErrors({});
     }
-  }, [open, editing]);
+  }, [open, editing, kyId]);
+
+  const filteredViTri = allViTri.filter((vt) => vt.cap_hoc === form.cap_hoc);
+
+  // Tự động tính tổng chỉ tiêu dựa trên các môn của cấp học đang chọn
+  useEffect(() => {
+    if (form.cap_hoc) {
+      const filtered = allViTri.filter((vt) => vt.cap_hoc === form.cap_hoc);
+      const total = filtered.reduce((sum, vt) => sum + (subjectTargets[vt.id] || 0), 0);
+      setForm((f) => {
+        if (f.so_chi_tieu !== String(total)) {
+          return { ...f, so_chi_tieu: String(total) };
+        }
+        return f;
+      });
+    } else {
+      setForm((f) => {
+        if (f.so_chi_tieu !== '0') {
+          return { ...f, so_chi_tieu: '0' };
+        }
+        return f;
+      });
+    }
+  }, [subjectTargets, form.cap_hoc, allViTri]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
     if (errors[key]) {
       setErrors((prev) => ({ ...prev, [key]: undefined }));
     }
+  }
+
+  function handleTargetChange(vitriId: number, val: string) {
+    const num = Math.max(0, parseInt(val) || 0);
+    setSubjectTargets((prev) => ({ ...prev, [vitriId]: num }));
   }
 
   function validate(): boolean {
@@ -95,6 +158,13 @@ export function DonViFormModal({ open, onOpenChange, kyId, editing, onSaved }: D
 
     setSubmitting(true);
     try {
+      const mappings = filteredViTri
+        .map((vt) => ({
+          vitri_tuyendung_id: vt.id,
+          so_luong_phan_bo: subjectTargets[vt.id] || 0
+        }))
+        .filter((m) => m.so_luong_phan_bo > 0);
+
       const payload = {
         ky_tuyendung_id: kyId,
         ma_don_vi: form.ma_don_vi.trim(),
@@ -104,7 +174,8 @@ export function DonViFormModal({ open, onOpenChange, kyId, editing, onSaved }: D
         so_dien_thoai: form.so_dien_thoai.trim() || null,
         nguoi_lien_he: form.nguoi_lien_he.trim() || null,
         ghi_chu: form.ghi_chu.trim() || null,
-        so_chi_tieu: Number(form.so_chi_tieu) || 0
+        so_chi_tieu: Number(form.so_chi_tieu) || 0,
+        mappings
       };
 
       const url = isEdit ? `/api/donvi/${editing!.id}` : '/api/donvi';
@@ -204,12 +275,12 @@ export function DonViFormModal({ open, onOpenChange, kyId, editing, onSaved }: D
               <Input
                 label="Số chỉ tiêu"
                 type="number"
-                min={0}
+                disabled
                 value={form.so_chi_tieu}
                 onChange={(e) => update('so_chi_tieu', e.target.value)}
                 error={errors.so_chi_tieu}
                 placeholder="0"
-                inputMode="numeric"
+                hint="Tự động tính từ chỉ tiêu môn"
               />
               <Input
                 label="Số điện thoại"
@@ -226,6 +297,43 @@ export function DonViFormModal({ open, onOpenChange, kyId, editing, onSaved }: D
                 placeholder="Họ tên người phụ trách"
               />
             </div>
+
+            {form.cap_hoc ? (
+              <div className="rounded-md border border-slate-200 bg-slate-50 p-4 space-y-3">
+                <h4 className="text-sm font-semibold text-slate-800">Chỉ tiêu theo môn học</h4>
+                {filteredViTri.length === 0 ? (
+                  <p className="text-xs text-slate-500">
+                    Không có vị trí tuyển dụng nào được cấu hình cho cấp học này trong kỳ hiện tại.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 max-h-[200px] overflow-y-auto pr-1">
+                    {filteredViTri.map((vt) => (
+                      <div
+                        key={vt.id}
+                        className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2 last:border-0 last:pb-0"
+                      >
+                        <label className="text-xs font-medium text-slate-700 truncate" title={vt.mon}>
+                          {vt.mon}
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          className="w-20 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
+                          value={subjectTargets[vt.id] ?? ''}
+                          onChange={(e) => handleTargetChange(vt.id, e.target.value)}
+                          placeholder="0"
+                          inputMode="numeric"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-md border border-dashed border-slate-200 p-4 text-center">
+                <p className="text-xs text-slate-500">Vui lòng chọn cấp học để cấu hình chỉ tiêu theo môn học</p>
+              </div>
+            )}
 
             <Textarea
               label="Ghi chú"

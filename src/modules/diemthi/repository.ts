@@ -100,13 +100,14 @@ export const diemthiRepository = {
     if (!existing) {
       // INSERT
       const info = db.prepare(`
-        INSERT INTO diemthi (thisinh_id, phongthi_id, diem_gk1, diem_gk2, vang_thi, bo_thi, ly_do_vang, trang_thai_nhap, ngay_nhap, nguoi_nhap)
-        VALUES (@thisinh_id, @phongthi_id, @diem_gk1, @diem_gk2, @vang_thi, @bo_thi, @ly_do_vang, @trang_thai_nhap, datetime('now'), @nguoi_nhap)
+        INSERT INTO diemthi (thisinh_id, phongthi_id, diem_gk1, diem_gk2, diem_dan_toc, vang_thi, bo_thi, ly_do_vang, trang_thai_nhap, ngay_nhap, nguoi_nhap)
+        VALUES (@thisinh_id, @phongthi_id, @diem_gk1, @diem_gk2, @diem_dan_toc, @vang_thi, @bo_thi, @ly_do_vang, @trang_thai_nhap, datetime('now'), @nguoi_nhap)
       `).run({
         thisinh_id: data.thisinh_id,
         phongthi_id: data.phongthi_id ?? null,
         diem_gk1: data.diem_gk1 ?? null,
         diem_gk2: data.diem_gk2 ?? null,
+        diem_dan_toc: data.diem_dan_toc ?? null,
         vang_thi: data.vang_thi ? 1 : 0,
         bo_thi: data.bo_thi ? 1 : 0,
         ly_do_vang: data.ly_do_vang ?? null,
@@ -126,6 +127,7 @@ export const diemthiRepository = {
       if (data.phongthi_id !== undefined) { fields.push('phongthi_id = ?'); params.push(data.phongthi_id ?? null); }
       if (data.diem_gk1 !== undefined) { fields.push('diem_gk1 = ?'); params.push(data.diem_gk1 ?? null); }
       if (data.diem_gk2 !== undefined) { fields.push('diem_gk2 = ?'); params.push(data.diem_gk2 ?? null); }
+      if (data.diem_dan_toc !== undefined) { fields.push('diem_dan_toc = ?'); params.push(data.diem_dan_toc ?? null); }
       if (data.vang_thi !== undefined) {
         fields.push('vang_thi = ?'); params.push(data.vang_thi ? 1 : 0);
         // Mutual exclusive: nếu set vang_thi=1 thì reset bo_thi=0

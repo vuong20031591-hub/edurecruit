@@ -1,4 +1,4 @@
-﻿/**
+/**
  * donvi module - types
  * File: src/modules/donvi/types.ts
  */
@@ -6,8 +6,8 @@ import type { DonViTuyenDung, DonViCreate, CapHoc } from '@/db/schema';
 
 export interface DonViView extends DonViTuyenDung {
   soThiSinh: number;
-  soViTri: number;
   kyTen?: string;
+  mappings?: Array<{ vitri_tuyendung_id: number; so_luong_phan_bo: number }>;
 }
 
 export interface DonViFilter {
@@ -27,6 +27,10 @@ export interface PaginatedDonVi {
 
 export type DonViUpdate = Partial<Omit<DonViCreate, 'ky_tuyendung_id'>>;
 
-export interface DonViCreateInput extends DonViCreate {}
+export interface DonViCreateInput extends DonViCreate {
+  mappings?: Array<{ vitri_tuyendung_id: number; so_luong_phan_bo: number }>;
+}
 
-export interface DonViUpdateInput extends DonViUpdate {}
+export interface DonViUpdateInput extends DonViUpdate {
+  mappings?: Array<{ vitri_tuyendung_id: number; so_luong_phan_bo: number }>;
+}

@@ -52,7 +52,7 @@ export const trangThaiHoSoSchema = z.enum([
 ]);
 
 export const quyenSchema = z.enum([Quyen.ADMIN, Quyen.TO_NHAP_HOSO, Quyen.TO_NHAP_DIEM, Quyen.LANH_DAO]);
-export const capHocSchema = z.enum([CapHoc.MN, CapHoc.TH, CapHoc.THCS, CapHoc.THPT, CapHoc.GDTX, CapHoc.DNTTHPT]);
+export const capHocSchema = z.enum([CapHoc.MN, CapHoc.TH, CapHoc.THCS, CapHoc.THPT, CapHoc.GDTX, CapHoc.DNTTHPT, CapHoc.THCS_THPT, CapHoc.TH_THCS]);
 export const gioiTinhSchema = z.enum([GioiTinh.Nam, GioiTinh.Nu, GioiTinh.Khac]);
 export const hinhThucThiSchema = z.enum([HinhThucThi.Viet, HinhThucThi.TracNghiem, HinhThucThi.ThucHanh]);
 export const ketQuaSchema = z.enum([KetQua.ChoXuLy, KetQua.Dat, KetQua.KhongDat, KetQua.Vang, KetQua.BoThi, KetQua.KhongDuDieuKien]);

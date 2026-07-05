@@ -298,12 +298,12 @@ export const raSoatService = {
                       .filter((m): m is string => !!m)
                       .join('; ');
                   }
-                  return 'Không đạt yêu cầu (chi tiết xem lịch sử rà soát)';
+                  return 'Không đủ yêu cầu (chi tiết xem lịch sử rà soát)';
                 } catch {
-                  return 'Không đạt yêu cầu (chi tiết xem lịch sử rà soát)';
+                  return 'Không đủ yêu cầu (chi tiết xem lịch sử rà soát)';
                 }
               })()
-            : 'Không đạt yêu cầu (chi tiết xem lịch sử rà soát)';
+            : 'Không đủ yêu cầu (chi tiết xem lịch sử rà soát)';
           newLyDo = issuesText;
           counts.khongDuDieuKien++;
         } else {

@@ -135,7 +135,7 @@ export async function GET(req: NextRequest) {
         { header: 'Phòng thi', key: 'phong', width: 12 },
         { header: 'Trạng thái hồ sơ', key: 'trang_thai_hoso', width: 18 },
         { header: 'Trạng thái xét tuyển', key: 'trang_thai_xettuyen', width: 20 },
-        { header: 'Đạt/Không đạt', key: 'dat_khongdat', width: 16 },
+        { header: 'Đỗ/Trượt', key: 'dat_khongdat', width: 16 },
       ];
       styleHeader(ws.getRow(1));
 
@@ -167,7 +167,7 @@ export async function GET(req: NextRequest) {
         const diemChuan = typeof r.diem_chuan === 'number' ? r.diem_chuan : null;
         const diemTong = typeof r.diem_tong === 'number' ? r.diem_tong : null;
         const datKhongDat = (diemChuan !== null && diemTong !== null)
-          ? (diemTong >= diemChuan ? 'Đạt' : 'Không đạt')
+          ? (diemTong >= diemChuan ? 'Đỗ' : 'Trượt')
           : '';
 
         const row = ws.addRow({

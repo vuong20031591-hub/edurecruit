@@ -1,7 +1,7 @@
 'use client';
 import { Fragment, useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Upload, FileSpreadsheet, AlertCircle, CheckCircle, X, Loader2, CheckCheck, ChevronDown, ChevronRight, Mail, Briefcase, GraduationCap, Users, Clock } from 'lucide-react';
+import { ArrowLeft, Download, FileSpreadsheet, AlertCircle, CheckCircle, X, Loader2, CheckCheck, ChevronDown, ChevronRight, Mail, Briefcase, GraduationCap, Users, Clock } from 'lucide-react';
 import { PageHeader, Button, toast } from '@/shared/components';
 import { useTopbar } from '@/shared/hooks/useTopbar';
 import { formatDate } from '@/shared/lib/format';
@@ -249,6 +249,7 @@ export default function ImportExcelPage() {
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const toggleRow = (row: number) => {
     setExpandedRows((prev) => {
@@ -314,6 +315,7 @@ export default function ImportExcelPage() {
     }
     setPreviewing(true);
     setPreview(null);
+    setPreviewError(null);
     try {
       const fd = new FormData();
       fd.append('file', f);
@@ -321,15 +323,18 @@ export default function ImportExcelPage() {
       const res = await fetch('/api/hosso/preview-import', { method: 'POST', body: fd });
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json.error || json.message || `HTTP ${res.status}`);
+        const msg = json.hint
+          ? `${json.error} — ${json.hint}`
+          : (json.error || json.message || `HTTP ${res.status}`);
+        setPreviewError(msg);
+        return;
       }
       const data = json as PreviewResponse;
       setPreview(data);
       const s = data.summary;
       toast.info(`Đọc xong ${data.totalRows} dòng: ${s.ok} OK · ${s.warning} cảnh báo · ${s.error} lỗi`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Lỗi preview');
-      setPreview(null);
+      setPreviewError(err instanceof Error ? err.message : 'Lỗi đọc file');
     } finally {
       setPreviewing(false);
     }
@@ -447,6 +452,21 @@ export default function ImportExcelPage() {
           />
         </div>
 
+        {/* Tải file mẫu */}
+        {!file && (
+          <div className="flex justify-center">
+            <a
+              href="/api/hosso/template"
+              download="mau_import_ho_so.xlsx"
+              className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Download size={13} />
+              Tải file Excel mẫu
+            </a>
+          </div>
+        )}
+
         {/* File đã chọn + parse info */}
         {file && (
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -484,6 +504,20 @@ export default function ImportExcelPage() {
                 </span>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Error banner khi file sai định dạng */}
+        {previewError && (
+          <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
+            <AlertCircle size={18} className="mt-0.5 shrink-0 text-red-500" />
+            <div className="flex-1 text-sm text-red-800">
+              <p className="font-medium">File không đúng định dạng</p>
+              <p className="mt-0.5 text-xs text-red-700">{previewError}</p>
+            </div>
+            <button type="button" onClick={() => { setPreviewError(null); resetAll(); }} className="rounded p-1 text-red-400 hover:bg-red-100">
+              <X size={14} />
+            </button>
           </div>
         )}
 

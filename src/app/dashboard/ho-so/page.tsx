@@ -306,7 +306,7 @@ export default function HoSoListPage() {
       applyHdr(17, 'Đơn vị dự tuyển');
       applyHdr(18, 'Trạng thái\n hồ sơ');
       applyHdr(19, 'Trạng thái\n xét tuyển');
-      applyHdr(20, 'Đạt/\nKhông đạt');
+      applyHdr(20, 'Đỗ/\nTrượt');
 
       // Sub-headers row 9 (chỉ cho cột I-M)
       const applyHdr9 = (col: number, value: string) => {
@@ -408,7 +408,7 @@ export default function HoSoListPage() {
           const diemChuan = ts.viTri?.diem_chuan ?? null;
           const diemTong = ts.ketQua?.diem_tong ?? null;
           const datKhongDat = (diemChuan !== null && diemTong !== null)
-            ? (diemTong >= diemChuan ? 'Đạt' : 'Không đạt')
+            ? (diemTong >= diemChuan ? 'Đỗ' : 'Trượt')
             : '';
 
           const vals = [
@@ -431,7 +431,7 @@ export default function HoSoListPage() {
             ts.donVi?.ten_don_vi ?? '',            // col17: Đơn vị
             trangThaiHoSo,                         // col18: Trạng thái hồ sơ
             trangThaiXetTuyen,                     // col19: Trạng thái xét tuyển
-            datKhongDat,                           // col20: Đạt/Không đạt
+            datKhongDat,                           // col20: Đỗ/Trượt
           ];
           vals.forEach((v, i) => {
             const cell = row.getCell(i + 1);

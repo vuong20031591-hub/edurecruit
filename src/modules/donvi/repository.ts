@@ -1,4 +1,4 @@
-﻿/**
+/**
  * donvi module - repository
  * File: src/modules/donvi/repository.ts
  */
@@ -55,8 +55,7 @@ export const donviRepository = {
         SELECT
           d.*,
           k.ten_ky AS ky_ten,
-          (SELECT COUNT(*) FROM thisinh t WHERE t.don_vi_du_tuyen_id = d.id) AS so_thi_sinh,
-          (SELECT COUNT(*) FROM vitri_donvi vd WHERE vd.don_vi_tuyen_dung_id = d.id) AS so_vi_tri
+          (SELECT COUNT(*) FROM thisinh t WHERE t.don_vi_du_tuyen_id = d.id) AS so_thi_sinh
         FROM don_vi_tuyen_dung d
         LEFT JOIN ky_tuyendung k ON d.ky_tuyendung_id = k.id
         ${where}
@@ -66,7 +65,6 @@ export const donviRepository = {
       .all(...params, pageSize, offset) as Array<DonViTuyenDung & {
         ky_ten: string | null;
         so_thi_sinh: number;
-        so_vi_tri: number;
       }>;
 
     const total = this.count(filter);
@@ -74,8 +72,7 @@ export const donviRepository = {
     const view: DonViView[] = data.map((r) => ({
       ...r,
       kyTen: r.ky_ten ?? undefined,
-      soThiSinh: r.so_thi_sinh,
-      soViTri: r.so_vi_tri
+      soThiSinh: r.so_thi_sinh
     }));
 
     return { data: view, total, page, pageSize };
@@ -132,6 +129,20 @@ export const donviRepository = {
 
   delete(id: number): void {
     getDb().prepare('DELETE FROM don_vi_tuyen_dung WHERE id = ?').run(id);
+  },
+
+  replaceMapping(donViId: number, items: { vitri_tuyendung_id: number; so_luong_phan_bo: number }[]): void {
+    const db = getDb();
+    db.prepare('DELETE FROM vitri_donvi WHERE don_vi_tuyen_dung_id = ?').run(donViId);
+    const insert = db.prepare(`
+      INSERT INTO vitri_donvi (vitri_tuyendung_id, don_vi_tuyen_dung_id, so_luong_phan_bo)
+      VALUES (?, ?, ?)
+    `);
+    for (const it of items) {
+      if (it.so_luong_phan_bo > 0) {
+        insert.run(it.vitri_tuyendung_id, donViId, it.so_luong_phan_bo);
+      }
+    }
   }
 };
 

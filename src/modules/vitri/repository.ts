@@ -60,8 +60,8 @@ export const vitriRepository = {
       SELECT
         v.*,
         k.ten_ky AS ky_ten,
-        (SELECT COUNT(*) FROM thisinh t WHERE t.vi_tri_dang_ky_id = v.id) AS so_thi_sinh,
-        (SELECT COUNT(*) FROM vitri_donvi vd WHERE vd.vitri_tuyendung_id = v.id) AS don_vi_count
+        (SELECT COUNT(*) FROM thisinh t WHERE t.vi_tri_dang_ky_id = v.id) AS soThiSinh,
+        (SELECT COUNT(*) FROM vitri_donvi vd WHERE vd.vitri_tuyendung_id = v.id) AS donViCount
       FROM vitri_tuyendung v
       LEFT JOIN ky_tuyendung k ON v.ky_tuyendung_id = k.id
       ${whereClause}

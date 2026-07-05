@@ -9,7 +9,7 @@ export type TrangThaiRaSoat = 'Dat' | 'CanhBao' | 'KhongDat';
 export type TrangThaiDiem = 'ChuaNhap' | 'DaNhap' | 'DaKhoa';
 export type TrangThaiPhongThi = 'ChuaSapXep' | 'DaSapXep' | 'DaKhoa' | 'DaThiXong';
 export type TrangThaiKy = 'Mo' | 'DangTuyen' | 'DaKhoa' | 'Huy';
-export type CapHoc = 'MN' | 'TH' | 'THCS' | 'THPT' | 'GDTX' | 'DNTTHPT';
+export type CapHoc = 'MN' | 'TH' | 'THCS' | 'THPT' | 'GDTX' | 'DNTTHPT' | 'THCS_THPT' | 'TH_THCS';
 export type GioiTinh = 'Nam' | 'Nu' | 'Khac';
 export type HinhThucThi = 'Viet' | 'TracNghiem' | 'ThucHanh';
 export type Quyen = 'ADMIN' | 'TO_NHAP_HOSO' | 'TO_NHAP_DIEM' | 'LANH_DAO';
@@ -239,7 +239,8 @@ export interface DiemThi {
   phongthi_id: number | null;
   diem_gk1: number | null;
   diem_gk2: number | null;
-  diem_thi_giang: number | null;     // computed by trigger
+  diem_thi_giang: number | null;     // computed by trigger: (GK1+GK2)/2, thang 100
+  diem_dan_toc: number | null;        // điểm cộng dân tộc thiểu số
   vang_thi: number;                  // 0/1
   bo_thi: number;                    // 0/1
   ly_do_vang: string | null;
@@ -253,7 +254,7 @@ export interface DiemThi {
 }
 
 export type DiemThiUpdate = Partial<
-  Pick<DiemThi, 'diem_gk1' | 'diem_gk2' | 'vang_thi' | 'bo_thi' | 'ly_do_vang' | 'phongthi_id'>
+  Pick<DiemThi, 'diem_gk1' | 'diem_gk2' | 'diem_dan_toc' | 'vang_thi' | 'bo_thi' | 'ly_do_vang' | 'phongthi_id'>
 >;
 
 export interface KetQuaRecord {

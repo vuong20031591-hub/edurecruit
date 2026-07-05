@@ -20,14 +20,20 @@ function calcDTB(gk1: number | null, gk2: number | null): number | null {
   return Math.round((gk1 + gk2) / 2 * 100) / 100;
 }
 
+function calcTong(gk1: number | null, gk2: number | null, uuTien: number | null, danToc: number | null): number | null {
+  const dtb = calcDTB(gk1, gk2);
+  if (dtb == null) return null;
+  return Math.round((dtb + (uuTien ?? 0) + (danToc ?? 0)) * 100) / 100;
+}
+
 function statusBadge(row: DiemThiView) {
   if (row.trang_thai_nhap === 'DaKhoa') return { label: 'Đã khóa', cls: 'bg-slate-100 text-slate-600 border-slate-300' };
   if (row.vang_thi) return { label: 'Vắng', cls: 'bg-orange-50 text-orange-600 border-orange-200' };
   if (row.bo_thi) return { label: 'Bỏ thi', cls: 'bg-red-50 text-red-600 border-red-200' };
   const dtb = calcDTB(row.diem_gk1, row.diem_gk2);
   if (dtb == null) return { label: 'Chưa nhập', cls: 'bg-slate-100 text-slate-500 border-slate-200' };
-  if (dtb >= 5) return { label: 'Đạt', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-  return { label: 'Không đạt', cls: 'bg-red-50 text-red-700 border-red-200' };
+  // ponytail: no Đỗ/Trượt here — determined by quota ranking, not threshold
+  return { label: 'Đã nhập', cls: 'bg-green-50 text-green-700 border-green-200' };
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -153,15 +159,14 @@ export default function NhapDiemPage() {
       r.thisinh_id === thiSinhId ? { ...r, [field]: val } : r
     ));
 
-    // Kiểm tra cảnh báo chênh lệch GK1-GK2 > 1.5 (PRD §V.1)
+    // Kiểm tra cảnh báo chênh lệch GK1-GK2 > 15 (thang 100)
     setRows(prev => {
       const row = prev.find(r => r.thisinh_id === thiSinhId);
       if (row) {
         const gk1 = field === 'diem_gk1' ? val : row.diem_gk1;
         const gk2 = field === 'diem_gk2' ? val : row.diem_gk2;
-        if (gk1 != null && gk2 != null && Math.abs(gk1 - gk2) > 1.5) {
-          // Hiển thị toast cảnh báo nhưng không chặn
-          toast.error(`SBD ${row.sbd ?? row.thisinh_id}: Chênh lệch GK1-GK2 = ${Math.abs(gk1 - gk2).toFixed(1)} > 1.5`);
+        if (gk1 != null && gk2 != null && Math.abs(gk1 - gk2) > 15) {
+          toast.error(`SBD ${row.sbd ?? row.thisinh_id}: Chênh lệch GK1-GK2 = ${Math.abs(gk1 - gk2).toFixed(1)} > 15`);
         }
       }
       return prev;
@@ -257,6 +262,32 @@ export default function NhapDiemPage() {
       }
     } catch {
       toast.error('Lỗi kết nối khi lưu điểm ưu tiên');
+    }
+  }
+
+  // ─── Điểm cộng dân tộc (onBlur → PUT /api/diemthi) ────────────────────
+
+  async function handleDanTocChange(thiSinhId: number, raw: string) {
+    const val = raw === '' ? null : parseFloat(raw);
+    if (val !== null && (isNaN(val) || val < 0 || val > 100)) return;
+
+    setRows(prev => prev.map(r =>
+      r.thisinh_id === thiSinhId ? { ...r, diem_dan_toc: val } : r
+    ));
+
+    try {
+      const res = await fetch('/api/diemthi', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ thisinh_id: thiSinhId, diem_dan_toc: val }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Lỗi lưu điểm dân tộc' }));
+        toast.error(err.error ?? 'Lỗi lưu điểm dân tộc');
+        diemRes.refresh(); diemStatsRes.refresh();
+      }
+    } catch {
+      toast.error('Lỗi kết nối khi lưu điểm dân tộc');
     }
   }
 
@@ -489,10 +520,10 @@ export default function NhapDiemPage() {
                         <label className="block text-[10px] font-semibold text-slate-400 mb-1 uppercase">GK 1</label>
                         <input
                           type="number"
-                          min={0} max={10} step={0.5}
+                          min={0} max={100} step={0.5}
                           disabled={isLocked}
                           value={row.diem_gk1 ?? ''}
-                          placeholder="0–10"
+                          placeholder="0–100"
                           className={cn(
                             'w-full rounded-lg border text-center outline-none transition-colors',
                             'px-2 py-2.5 text-base',
@@ -507,10 +538,10 @@ export default function NhapDiemPage() {
                         <label className="block text-[10px] font-semibold text-slate-400 mb-1 uppercase">GK 2</label>
                         <input
                           type="number"
-                          min={0} max={10} step={0.5}
+                          min={0} max={100} step={0.5}
                           disabled={isLocked}
                           value={row.diem_gk2 ?? ''}
-                          placeholder="0–10"
+                          placeholder="0–100"
                           className={cn(
                             'w-full rounded-lg border text-center outline-none transition-colors',
                             'px-2 py-2.5 text-base',
@@ -534,9 +565,9 @@ export default function NhapDiemPage() {
                       </div>
                     </div>
 
-                    {/* Ưu tiên + Vắng/Bỏ row */}
-                    <div className="flex items-center">
-                      <label className="text-sm text-slate-500 mr-1.5">Ưu tiên:</label>
+                    {/* Ưu tiên + Dân tộc + Vắng/Bỏ row */}
+                    <div className="flex items-center gap-3">
+                      <label className="text-sm text-slate-500">Ưu tiên:</label>
                       <input
                         type="text"
                         inputMode="decimal"
@@ -555,6 +586,27 @@ export default function NhapDiemPage() {
                           const num = parseFloat(raw);
                           if (!isNaN(num) && num >= 0) handleUuTienChange(row.thisinh_id, raw);
                           else e.target.value = row.diem_uu_tien != null ? String(row.diem_uu_tien) : '';
+                        }}
+                      />
+                      <label className="text-sm text-slate-500">Dân tộc:</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        disabled={isLocked}
+                        defaultValue={row.diem_dan_toc != null ? String(row.diem_dan_toc) : ''}
+                        placeholder="—"
+                        className={cn(
+                          'w-16 rounded-lg border text-center text-sm outline-none transition-colors px-2 py-1.5',
+                          isLocked
+                            ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                            : 'bg-violet-50 border-violet-200 text-violet-800 focus:border-violet-400 focus:ring-1 focus:ring-violet-100'
+                        )}
+                        onBlur={e => {
+                          const raw = e.target.value.trim();
+                          if (raw === '' || raw === String(row.diem_dan_toc ?? '')) return;
+                          const num = parseFloat(raw);
+                          if (!isNaN(num) && num >= 0) handleDanTocChange(row.thisinh_id, raw);
+                          else e.target.value = row.diem_dan_toc != null ? String(row.diem_dan_toc) : '';
                         }}
                       />
                       <div className="ml-auto flex items-center gap-3">
@@ -594,7 +646,7 @@ export default function NhapDiemPage() {
             {/* ── Desktop Grid ── */}
             <div className="hidden lg:block overflow-x-auto">
             {/* Table header */}
-            <div className="grid bg-[#1d293d]" style={{ gridTemplateColumns: '110px 1fr 90px 90px 90px 90px 110px 120px' }}>
+            <div className="grid bg-[#1d293d]" style={{ gridTemplateColumns: '110px 1fr 90px 90px 90px 90px 90px 110px 120px' }}>
               <div className="px-4 py-3">
                 <span className="text-xs font-semibold tracking-wide text-slate-300 uppercase">SBD</span>
               </div>
@@ -616,6 +668,10 @@ export default function NhapDiemPage() {
               </div>
               <div className="px-4 py-3">
                 <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Ưu tiên</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">Điểm cộng</div>
+              </div>
+              <div className="px-4 py-3">
+                <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Dân tộc</div>
                 <div className="text-[10px] text-slate-500 mt-0.5">Điểm cộng</div>
               </div>
               <div className="px-3 py-3">
@@ -644,7 +700,7 @@ export default function NhapDiemPage() {
                     isHighlighted && 'bg-blue-50 ring-2 ring-inset ring-blue-400',
                     (row.vang_thi || row.bo_thi) && !isHighlighted && 'bg-orange-50/40',
                   )}
-                  style={{ gridTemplateColumns: '110px 1fr 90px 90px 90px 90px 110px 120px' }}
+                  style={{ gridTemplateColumns: '110px 1fr 90px 90px 90px 90px 90px 110px 120px' }}
                 >
                   {/* SBD */}
                   <div className="px-4 py-3 flex items-center">
@@ -662,10 +718,10 @@ export default function NhapDiemPage() {
                   <div className="px-3 py-2.5 flex items-center">
                     <input
                       type="number"
-                      min={0} max={10} step={0.5}
+                      min={0} max={100} step={0.5}
                       disabled={isLocked}
                       value={row.diem_gk1 ?? ''}
-                      placeholder="0–10"
+                      placeholder="0–100"
                       className={cn(
                         'w-full rounded-lg border text-center text-sm outline-none transition-colors',
                         'px-2 py-1.5',
@@ -681,10 +737,10 @@ export default function NhapDiemPage() {
                   <div className="px-3 py-2.5 flex items-center">
                     <input
                       type="number"
-                      min={0} max={10} step={0.5}
+                      min={0} max={100} step={0.5}
                       disabled={isLocked}
                       value={row.diem_gk2 ?? ''}
-                      placeholder="0–10"
+                      placeholder="0–100"
                       className={cn(
                         'w-full rounded-lg border text-center text-sm outline-none transition-colors',
                         'px-2 py-1.5',
@@ -728,6 +784,30 @@ export default function NhapDiemPage() {
                         const num = parseFloat(raw);
                         if (!isNaN(num) && num >= 0) handleUuTienChange(row.thisinh_id, raw);
                         else e.target.value = row.diem_uu_tien != null ? String(row.diem_uu_tien) : '';
+                      }}
+                    />
+                  </div>
+
+                  {/* Điểm cộng dân tộc */}
+                  <div className="px-3 py-2.5 flex items-center">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      disabled={isLocked}
+                      defaultValue={row.diem_dan_toc != null ? String(row.diem_dan_toc) : ''}
+                      placeholder="—"
+                      className={cn(
+                        'w-full rounded-lg border text-center text-sm outline-none transition-colors px-2 py-1.5',
+                        isLocked
+                          ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                          : 'bg-teal-50 border-teal-200 text-teal-800 focus:border-teal-400 focus:ring-1 focus:ring-teal-100'
+                      )}
+                      onBlur={e => {
+                        const raw = e.target.value.trim();
+                        if (raw === '' || raw === String(row.diem_dan_toc ?? '')) return;
+                        const num = parseFloat(raw);
+                        if (!isNaN(num) && num >= 0) handleDanTocChange(row.thisinh_id, raw);
+                        else e.target.value = row.diem_dan_toc != null ? String(row.diem_dan_toc) : '';
                       }}
                     />
                   </div>

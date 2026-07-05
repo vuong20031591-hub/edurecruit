@@ -36,6 +36,20 @@ export async function PUT(req: NextRequest) {
     const session = await requirePerm(req, 'diemthi.nhap');
     const body = await req.json();
     const result = await diemthiService.upsert(body, session);
+
+    // Sync diem_tong trong ketqua nếu diem_dan_toc thay đổi
+    if (body.diem_dan_toc !== undefined) {
+      const { getDb } = await import('@/db');
+      const db = getDb();
+      const kq = db.prepare('SELECT diem_uu_tien FROM ketqua WHERE thisinh_id = ?').get(body.thisinh_id) as
+        { diem_uu_tien: number } | undefined;
+      if (kq) {
+        const diemTong = (result.diem_thi_giang ?? 0) + (kq.diem_uu_tien ?? 0) + (result.diem_dan_toc ?? 0);
+        db.prepare('UPDATE ketqua SET diem_tong = ?, updated_at = datetime(\'now\') WHERE thisinh_id = ?')
+          .run(diemTong, body.thisinh_id);
+      }
+    }
+
     return json(result);
   } catch (err) {
     return handleApiError(err);

@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     }
     const phanBoDiem = bins.map(b => ({ label: b.label, count: b.count, color: b.color }));
 
-    // ── 2. Tỷ lệ đậu/rớt ─────────────────────────────────────────────────
+    // ── 2. Tỷ lệ đỗ/trượt ─────────────────────────────────────────────────
     let dat = 0, khongDat = 0;
     for (const { diem_thi_giang: d } of diemRows) {
       if (d >= 5) dat++;

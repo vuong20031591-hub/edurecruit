@@ -43,6 +43,7 @@ export interface DiemThiUpsert {
   phongthi_id?: number | null;
   diem_gk1?: number | null;
   diem_gk2?: number | null;
+  diem_dan_toc?: number | null;
   vang_thi?: boolean | number;
   bo_thi?: boolean | number;
   ly_do_vang?: string | null;

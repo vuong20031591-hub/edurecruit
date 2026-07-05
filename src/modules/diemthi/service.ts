@@ -37,12 +37,15 @@ export const diemthiService = {
       throw new ConflictError('Điểm đã khóa, không thể chỉnh sửa');
     }
 
-    // Validate điểm range 0–10
-    if (data.diem_gk1 != null && (data.diem_gk1 < 0 || data.diem_gk1 > 10)) {
-      throw new ValidationError('Điểm GK1 phải từ 0 đến 10');
+    // Validate điểm range 0–100
+    if (data.diem_gk1 != null && (data.diem_gk1 < 0 || data.diem_gk1 > 100)) {
+      throw new ValidationError('Điểm GK1 phải từ 0 đến 100');
     }
-    if (data.diem_gk2 != null && (data.diem_gk2 < 0 || data.diem_gk2 > 10)) {
-      throw new ValidationError('Điểm GK2 phải từ 0 đến 10');
+    if (data.diem_gk2 != null && (data.diem_gk2 < 0 || data.diem_gk2 > 100)) {
+      throw new ValidationError('Điểm GK2 phải từ 0 đến 100');
+    }
+    if (data.diem_dan_toc != null && (data.diem_dan_toc < 0 || data.diem_dan_toc > 100)) {
+      throw new ValidationError('Điểm cộng dân tộc phải từ 0 đến 100');
     }
 
     const result = diemthiRepository.upsert(data, actorId(session));

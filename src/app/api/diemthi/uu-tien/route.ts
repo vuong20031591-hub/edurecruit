@@ -24,11 +24,12 @@ export async function PUT(req: NextRequest) {
     const ts = db.prepare('SELECT id FROM thisinh WHERE id = ?').get(thisinh_id);
     if (!ts) throw new NotFoundError(`Thí sinh #${thisinh_id} không tồn tại`);
 
-    // Lấy diem_thi_giang hiện tại từ diemthi
-    const dt = db.prepare('SELECT diem_thi_giang FROM diemthi WHERE thisinh_id = ?').get(thisinh_id) as
-      { diem_thi_giang: number | null } | undefined;
+    // Lấy diem_thi_giang và diem_dan_toc hiện tại từ diemthi
+    const dt = db.prepare('SELECT diem_thi_giang, diem_dan_toc FROM diemthi WHERE thisinh_id = ?').get(thisinh_id) as
+      { diem_thi_giang: number | null; diem_dan_toc: number | null } | undefined;
     const diemThiGiang = dt?.diem_thi_giang ?? null;
-    const diemTong = (diemThiGiang ?? 0) + diem_uu_tien;
+    const diemDanToc = dt?.diem_dan_toc ?? 0;
+    const diemTong = (diemThiGiang ?? 0) + diem_uu_tien + diemDanToc;
 
     const userId = parseInt(session.sub, 10);
 

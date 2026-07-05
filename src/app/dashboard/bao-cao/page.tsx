@@ -48,7 +48,7 @@ const EXPORT_FILES = [
   },
   {
     id: 'ds-dau',
-    name: 'Danh sách thí sinh đậu viên chức',
+    name: 'Danh sách thí sinh đỗ viên chức',
     type: 'PDF' as const,
     badgeCls: 'bg-red-50 text-red-700 border-red-200',
   },
@@ -112,8 +112,8 @@ export default function BaoCaoPage() {
 
   // Pie chart data
   const pieData = data.tyLe.tong > 0 ? [
-    { name: `Đạt (≥5.0)`, value: data.tyLe.dat, fill: '#10b981' },
-    { name: `Không đạt (<5.0)`, value: data.tyLe.khongDat, fill: '#ef4444' },
+    { name: `Đỗ (≥5.0)`, value: data.tyLe.dat, fill: '#10b981' },
+    { name: `Trượt (<5.0)`, value: data.tyLe.khongDat, fill: '#ef4444' },
     ...(data.tyLe.vangBo > 0 ? [{ name: 'Vắng/Bỏ', value: data.tyLe.vangBo, fill: '#94a3b8' }] : []),
   ] : [];
 
@@ -194,12 +194,12 @@ export default function BaoCaoPage() {
             </div>
             <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-center">
               <div className="text-2xl font-bold text-emerald-600">{data.tyLe.tyLeDat}%</div>
-              <div className="text-xs text-slate-500 mt-0.5">Tỷ lệ đạt</div>
+              <div className="text-xs text-slate-500 mt-0.5">Tỷ lệ đỗ</div>
             </div>
             {data.tyLe.dat > 0 && (
               <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-center">
                 <div className="text-2xl font-bold text-red-500">{data.tyLe.tyLeRat}%</div>
-                <div className="text-xs text-slate-500 mt-0.5">Tỷ lệ không đạt</div>
+                <div className="text-xs text-slate-500 mt-0.5">Tỷ lệ trượt</div>
               </div>
             )}
           </div>
@@ -238,10 +238,10 @@ export default function BaoCaoPage() {
               )}
             </div>
 
-            {/* Tỷ lệ đậu / rớt */}
+            {/* Tỷ lệ đỗ / trượt */}
             <div className="rounded-xl border border-slate-200 bg-white p-5">
               <div className="mb-4">
-                <h3 className="text-lg font-semibold text-slate-800">Tỷ lệ đậu / rớt</h3>
+                <h3 className="text-lg font-semibold text-slate-800">Tỷ lệ đỗ / trượt</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Toàn kỳ tuyển dụng {topbar.ky?.nam ?? ''}</p>
               </div>
               {pieData.length > 0 ? (
@@ -282,7 +282,7 @@ export default function BaoCaoPage() {
                       </div>
                     ))}
                     <div className="mt-2 border-t border-slate-100 pt-2">
-                      <p className="text-xs text-slate-500">Tỷ lệ đạt:</p>
+                      <p className="text-xs text-slate-500">Tỷ lệ đỗ:</p>
                       <p className="text-xl font-bold text-emerald-600">{data.tyLe.tyLeDat}%</p>
                     </div>
                   </div>
@@ -298,11 +298,11 @@ export default function BaoCaoPage() {
             <div className="mb-4 flex items-start justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-slate-800">Kết quả theo vị trí tuyển dụng</h3>
-                <p className="text-xs text-slate-500 mt-0.5">So sánh đạt / không đạt theo từng vị trí</p>
+                <p className="text-xs text-slate-500 mt-0.5">So sánh đỗ / trượt theo từng vị trí</p>
               </div>
               <div className="flex items-center gap-4 text-xs">
-                <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm bg-emerald-500" />Đạt</span>
-                <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm bg-red-400" />Không đạt</span>
+                <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm bg-emerald-500" />Đỗ</span>
+                <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm bg-red-400" />Trượt</span>
               </div>
             </div>
             {data.ketQuaTheoViTri.length > 0 ? (
@@ -313,8 +313,8 @@ export default function BaoCaoPage() {
                     <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                     <Tooltip content={<CustomGroupedTooltip />} />
-                    <Bar dataKey="dat" name="Đạt" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                    <Bar dataKey="khongDat" name="Không đạt" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                    <Bar dataKey="dat" name="Đỗ" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                    <Bar dataKey="khongDat" name="Trượt" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={40} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (

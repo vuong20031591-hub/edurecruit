@@ -17,7 +17,7 @@ import type {
   ViTriDonViInput
 } from './types';
 
-const VALID_CAP_HOC: CapHoc[] = ['MN', 'TH', 'THCS', 'THPT', 'GDTX', 'DNTTHPT'];
+const VALID_CAP_HOC: CapHoc[] = ['MN', 'TH', 'THCS', 'THPT', 'GDTX', 'DNTTHPT', 'THCS_THPT', 'TH_THCS'];
 const VALID_HINH_THUC: HinhThucThi[] = ['Viet', 'TracNghiem', 'ThucHanh'];
 const VALID_TIEU_CHI = ['diem_thi_giang', 'doi_tuong_uu_tien', 'xep_loai_bang', 'ngay_nop_ho_so'];
 

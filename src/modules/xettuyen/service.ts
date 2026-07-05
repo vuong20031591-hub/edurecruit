@@ -87,21 +87,35 @@ export const xettuyenService = {
         )
       `).run(kyId);
 
-      const vitriList = db.prepare(`
-        SELECT id, ma_vi_tri, mon, thu_tu_uu_tien_dong_diem FROM vitri_tuyendung WHERE ky_tuyendung_id = ?
-      `).all(kyId) as ViTriRow[];
+      interface NhomRow {
+        vi_tri_dang_ky_id: number;
+        don_vi_du_tuyen_id: number;
+        so_luong_phan_bo: number;
+        ma_vi_tri: string;
+        mon: string;
+        thu_tu_uu_tien_dong_diem: string | null;
+      }
+
+      const nhomList = db.prepare(`
+        SELECT DISTINCT 
+          t.vi_tri_dang_ky_id, 
+          t.don_vi_du_tuyen_id, 
+          COALESCE(vd.so_luong_phan_bo, 0) AS so_luong_phan_bo,
+          v.ma_vi_tri,
+          v.mon,
+          v.thu_tu_uu_tien_dong_diem
+        FROM thisinh t
+        JOIN vitri_tuyendung v ON v.id = t.vi_tri_dang_ky_id
+        LEFT JOIN vitri_donvi vd ON vd.vitri_tuyendung_id = t.vi_tri_dang_ky_id AND vd.don_vi_tuyen_dung_id = t.don_vi_du_tuyen_id
+        WHERE t.ky_tuyendung_id = ? AND t.trang_thai_ho_so = 'HopLe'
+      `).all(kyId) as NhomRow[];
 
       const insertKetqua = db.prepare(`
         INSERT INTO ketqua (thisinh_id, diem_thi_giang, diem_uu_tien, diem_tong, xep_hang, ket_qua, ghi_chu, ngay_chay, nguoi_chay)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
-      for (const vitri of vitriList) {
-        const chiTieu = db.prepare(`
-          SELECT COALESCE(SUM(so_luong_phan_bo), 0) AS tong
-          FROM vitri_donvi WHERE vitri_tuyendung_id = ?
-        `).get(vitri.id) as { tong: number };
-
+      for (const nhom of nhomList) {
         const danhSach = db.prepare(`
           SELECT
             t.id AS thisinh_id,
@@ -116,9 +130,10 @@ export const xettuyenService = {
           JOIN diemthi dt ON dt.thisinh_id = t.id
           LEFT JOIN ketqua kq ON kq.thisinh_id = t.id
           WHERE t.vi_tri_dang_ky_id = ?
+            AND t.don_vi_du_tuyen_id = ?
             AND t.trang_thai_ho_so = 'HopLe'
             AND dt.trang_thai_nhap = 'DaKhoa'
-        `).all(vitri.id) as ThiSinhDiem[];
+        `).all(nhom.vi_tri_dang_ky_id, nhom.don_vi_du_tuyen_id) as ThiSinhDiem[];
 
         const scored = danhSach.map(ts => ({
           ...ts,
@@ -152,8 +167,8 @@ export const xettuyenService = {
           return 0;
         };
 
-        const criteria = vitri.thu_tu_uu_tien_dong_diem
-          ? (JSON.parse(vitri.thu_tu_uu_tien_dong_diem) as string[])
+        const criteria = nhom.thu_tu_uu_tien_dong_diem
+          ? (JSON.parse(nhom.thu_tu_uu_tien_dong_diem) as string[])
           : ['diem_thi_giang', 'doi_tuong_uu_tien', 'xep_loai_bang', 'ngay_nop_ho_so'];
 
         scored.sort((a, b) => {
@@ -198,7 +213,7 @@ export const xettuyenService = {
           if (!datDieuKien) {
             insertKetqua.run(
               ts.thisinh_id, ts.diem_thi_giang, ts.diem_uu_tien,
-              ts.diem_tong, null, 'KhongDat', 'Không đạt điểm tối thiểu', now, userId
+              ts.diem_tong, null, 'KhongDat', 'Trượt điểm tối thiểu', now, userId
             );
             khongDatCount++;
             continue;
@@ -206,7 +221,7 @@ export const xettuyenService = {
 
           rank++;
 
-          if (rank <= chiTieu.tong) {
+          if (rank <= nhom.so_luong_phan_bo) {
             insertKetqua.run(
               ts.thisinh_id, ts.diem_thi_giang, ts.diem_uu_tien,
               ts.diem_tong, rank, 'Dat', null, now, userId
@@ -222,7 +237,8 @@ export const xettuyenService = {
         }
       }
 
-      return vitriList.length;
+      const uniqueViTriCount = new Set(nhomList.map(n => n.vi_tri_dang_ky_id)).size;
+      return uniqueViTriCount;
     });
 
     const vitriCount = tx();

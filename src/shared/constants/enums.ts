@@ -82,7 +82,9 @@ export const CapHoc = {
   THCS: 'THCS',
   THPT: 'THPT',
   GDTX: 'GDTX',
-  DNTTHPT: 'DNTTHPT'
+  DNTTHPT: 'DNTTHPT',
+  THCS_THPT: 'THCS_THPT',
+  TH_THCS: 'TH_THCS'
 } as const;
 
 export const CapHocLabel: Record<string, string> = {
@@ -91,7 +93,9 @@ export const CapHocLabel: Record<string, string> = {
   THCS: 'THCS',
   THPT: 'THPT',
   GDTX: 'Giáo dục thường xuyên',
-  DNTTHPT: 'Dân tộc nội trú THPT'
+  DNTTHPT: 'Dân tộc nội trú THPT',
+  THCS_THPT: 'THCS & THPT',
+  TH_THCS: 'TH & THCS'
 };
 
 // ============================================================================
@@ -135,8 +139,8 @@ export const KetQua = {
 
 export const KetQuaLabel: Record<string, string> = {
   ChoXuLy: 'Chờ xử lý',
-  Dat: 'Đạt',
-  KhongDat: 'Không đạt',
+  Dat: 'Đỗ',
+  KhongDat: 'Trượt',
   Vang: 'Vắng thi',
   BoThi: 'Bỏ thi',
   KhongDuDieuKien: 'Không đủ điều kiện'

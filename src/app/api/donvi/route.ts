@@ -6,7 +6,7 @@ import type { CapHoc } from '@/db/schema';
 
 export const dynamic = 'force-dynamic';
 
-const VALID_CAP_HOC: CapHoc[] = ['MN', 'TH', 'THCS', 'THPT', 'GDTX', 'DNTTHPT'];
+const VALID_CAP_HOC: CapHoc[] = ['MN', 'TH', 'THCS', 'THPT', 'GDTX', 'DNTTHPT', 'THCS_THPT', 'TH_THCS'];
 
 export async function GET(req: NextRequest) {
   try {

@@ -33,6 +33,14 @@ function getApplied(): AppliedMigration[] {
 
 function applyMigration(name: string, sql: string): void {
   const db = getDb();
+  // Migration đánh dấu "-- @no-transaction" ở dòng đầu → chạy ngoài transaction.
+  // Cần thiết cho recreate-table (PRAGMA foreign_keys không có tác dụng trong transaction).
+  const noTx = sql.trimStart().startsWith('-- @no-transaction');
+  if (noTx) {
+    db.exec(sql);
+    db.prepare('INSERT INTO _migrations (name) VALUES (?)').run(name);
+    return;
+  }
   const tx = db.transaction(() => {
     db.exec(sql);
     db.prepare('INSERT INTO _migrations (name) VALUES (?)').run(name);
