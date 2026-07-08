@@ -269,6 +269,21 @@ export default function PhongThiPage() {
             In danh sách
           </Button>
 
+          {/* Xuất niêm yết phòng thi (Excel) */}
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<Printer size={14} />}
+            onClick={() => {
+              if (kyId) {
+                window.location.href = `/api/bao-cao/xuat?loai=niem-yet&ky_tuyendung_id=${kyId}`;
+              }
+            }}
+            disabled={!kyId}
+          >
+            Niêm yết phòng thi (Excel)
+          </Button>
+
           {/* Xuất phòng chờ (Excel) */}
           <Button
             variant="outline"

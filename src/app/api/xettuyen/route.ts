@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { handleApiError, requirePerm, json, ValidationError } from '@/server/api';
 import { audit } from '@/server/audit';
+import { notify } from '@/server/notify';
 import { xettuyenService } from '@/modules/xettuyen/service';
 
 export async function POST(req: NextRequest) {
@@ -29,6 +30,14 @@ export async function POST(req: NextRequest) {
       resourceId: ky_tuyendung_id,
       payload: result,
       result: 'SUCCESS',
+    });
+
+    notify({
+      userId,
+      loai: 'XetTuyen',
+      tieuDe: `Xét tuyển hoàn tất kỳ #${ky_tuyendung_id}`,
+      noiDung: `Đã xử lý ${(result as { total?: number }).total ?? 0} hồ sơ`,
+      lienKet: '/dashboard/ket-qua',
     });
 
     return json(result);

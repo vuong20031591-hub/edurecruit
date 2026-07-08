@@ -26,7 +26,8 @@ export interface TopbarData {
 
 export async function GET(req: NextRequest) {
   try {
-    await requireAuth(req);
+    const session = await requireAuth(req);
+    const userId = Number(session.sub);
     const db = getDb();
 
     // 1. Kỳ hiện tại (từ config, fallback về kỳ mới nhất)
@@ -48,8 +49,8 @@ export async function GET(req: NextRequest) {
         (SELECT COUNT(*) FROM thisinh WHERE ky_tuyendung_id = ? AND trang_thai_ho_so IN ('CanBoSung', 'ChoRaSoat')) AS badgeHoSoChoDuyet,
         (SELECT COUNT(*) FROM thisinh WHERE ky_tuyendung_id = ? AND trang_thai_ho_so = 'HopLe') AS hoSoHopLe,
         (SELECT COUNT(*) FROM thisinh WHERE ky_tuyendung_id = ? AND trang_thai_ho_so IN ('CanBoSung', 'ChoRaSoat')) AS hoSoChoDuyet,
-        (SELECT COUNT(*) FROM log_he_thong WHERE ngay_thuc_hien >= datetime('now', '-7 days') AND result = 'SUCCESS') AS thongBao
-    `).get(kyId, kyId, kyId) as {
+        (SELECT COUNT(*) FROM thong_bao WHERE user_id = ? AND da_doc = 0) AS thongBao
+    `).get(kyId, kyId, kyId, userId) as {
       badgeHoSoChoDuyet: number;
       hoSoHopLe: number;
       hoSoChoDuyet: number;

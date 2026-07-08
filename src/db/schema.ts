@@ -357,3 +357,14 @@ export interface ImportBatch {
   ngay_import: string;
   trang_thai: TrangThaiImport;
 }
+
+export interface ThongBao {
+  id: number;
+  user_id: number | null;
+  loai: 'HoSo' | 'XetTuyen' | 'ChiTieu' | 'HeThong';
+  tieu_de: string;
+  noi_dung: string | null;
+  lien_ket: string | null;
+  da_doc: number;
+  created_at: string;
+}

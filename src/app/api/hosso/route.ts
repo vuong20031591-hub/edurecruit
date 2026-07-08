@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { handleApiError, requirePerm, json } from '@/server/api';
 import { hossoService } from '@/modules/hosso/service';
+import { notify } from '@/server/notify';
 import type { ThiSinhFilter } from '@/modules/hosso/types';
 import type { ThiSinhCreate } from '@/db/schema';
 
@@ -37,6 +38,12 @@ export async function POST(req: NextRequest) {
     if (body.gioi_tinh === 'Nữ') body.gioi_tinh = 'Nu';
     if (body.gioi_tinh === 'Khác') body.gioi_tinh = 'Khac';
     const result = await hossoService.createThiSinh(body, session);
+    notify({
+      userId: parseInt(session.sub, 10),
+      loai: 'HoSo',
+      tieuDe: `Hồ sơ mới chờ duyệt: ${(result as { ho_ten?: string }).ho_ten ?? body.ho_ten ?? ''}`,
+      lienKet: '/dashboard/ho-so',
+    });
     return json(result, { status: 201 });
   } catch (err) {
     return handleApiError(err);

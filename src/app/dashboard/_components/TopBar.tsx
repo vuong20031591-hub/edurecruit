@@ -1,11 +1,88 @@
 'use client';
-import { Bell, ChevronDown, Search } from 'lucide-react';
-import { useState } from 'react';
+import { Bell, ChevronDown, Search, CheckCheck } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 import { initials } from '@/shared/lib/format';
 import { QuyenLabel } from '@/shared/constants/enums';
-import type { Quyen } from '@/db/schema';
-import { useTopbar } from '@/shared/hooks/useTopbar';
+import type { Quyen, ThongBao } from '@/db/schema';
+import { useTopbar, refreshTopbar } from '@/shared/hooks/useTopbar';
 import { GuideLauncher } from '@/shared/components/Guide';
+
+const LOAI_LABEL: Record<string, string> = {
+  HoSo: 'Hồ sơ', XetTuyen: 'Xét tuyển', ChiTieu: 'Chỉ tiêu', HeThong: 'Hệ thống',
+};
+
+function BellDropdown({ onClose }: { onClose: () => void }) {
+  const [items, setItems] = useState<ThongBao[]>([]);
+  const [loading, setLoading] = useState(true);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch('/api/thong-bao?limit=10')
+      .then(r => r.json())
+      .then(d => setItems(d.data ?? []))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  async function markAll() {
+    await fetch('/api/thong-bao/doc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ all: true }) });
+    setItems(prev => prev.map(i => ({ ...i, da_doc: 1 })));
+    refreshTopbar();
+  }
+
+  async function markOne(id: number, lienKet?: string | null) {
+    await fetch('/api/thong-bao/doc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [id] }) });
+    setItems(prev => prev.map(i => i.id === id ? { ...i, da_doc: 1 } : i));
+    refreshTopbar();
+    if (lienKet) window.location.href = lienKet;
+  }
+
+  return (
+    <div ref={ref} className="absolute right-0 top-12 z-20 w-80 rounded-md border border-slate-200 bg-white shadow-lg">
+      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+        <span className="text-sm font-medium text-slate-900">Thông báo</span>
+        <button onClick={markAll} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700">
+          <CheckCheck size={13} /> Đánh dấu tất cả đã đọc
+        </button>
+      </div>
+      <div className="max-h-80 overflow-y-auto">
+        {loading && <div className="px-3 py-4 text-sm text-slate-400 text-center">Đang tải...</div>}
+        {!loading && items.length === 0 && <div className="px-3 py-4 text-sm text-slate-400 text-center">Không có thông báo</div>}
+        {items.map(item => (
+          <button
+            key={item.id}
+            onClick={() => markOne(item.id, item.lien_ket)}
+            className={`w-full text-left px-3 py-2.5 border-b border-slate-50 hover:bg-slate-50 transition-colors ${item.da_doc ? 'opacity-60' : ''}`}
+          >
+            <div className="flex items-start gap-2">
+              {!item.da_doc && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />}
+              {!!item.da_doc && <span className="mt-1.5 h-2 w-2 shrink-0" />}
+              <div className="min-w-0">
+                <div className="text-xs font-medium text-slate-700 truncate">{item.tieu_de}</div>
+                {item.noi_dung && <div className="text-xs text-slate-500 truncate">{item.noi_dung}</div>}
+                <div className="mt-0.5 text-2xs text-slate-400">
+                  {LOAI_LABEL[item.loai] ?? item.loai} · {new Date(item.created_at).toLocaleDateString('vi-VN')}
+                </div>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+      <div className="border-t border-slate-100 px-3 py-2">
+        <a href="/dashboard/thong-bao" className="block text-center text-xs text-blue-600 hover:text-blue-700">
+          Xem tất cả thông báo
+        </a>
+      </div>
+    </div>
+  );
+}
 
 interface TopBarProps {
   session: { ho_ten: string; quyen: Quyen; username: string };
@@ -14,6 +91,7 @@ interface TopBarProps {
 export function TopBar({ session }: TopBarProps) {
   const { data } = useTopbar();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showBell, setShowBell] = useState(false);
 
   return (
     <header className="no-print flex h-13 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-5 md:px-5 pl-14 md:pl-5">
@@ -55,19 +133,23 @@ export function TopBar({ session }: TopBarProps) {
         </div>
       </div>
 
-      {/* Bell with badge */}
-      <button
-        type="button"
-        className="relative flex h-9 w-9 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
-        aria-label="Thông báo"
-      >
-        <Bell size={16} />
-        {data.thongBao > 0 && (
-          <span className="absolute right-1.5 top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-status-danger px-1 text-2xs font-semibold text-white">
-            {data.thongBao > 99 ? '99+' : data.thongBao}
-          </span>
-        )}
-      </button>
+      {/* Bell with badge + dropdown */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setShowBell(b => !b)}
+          className="relative flex h-9 w-9 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          aria-label="Thông báo"
+        >
+          <Bell size={16} />
+          {data.thongBao > 0 && (
+            <span className="absolute right-1.5 top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-status-danger px-1 text-2xs font-semibold text-white">
+              {data.thongBao > 99 ? '99+' : data.thongBao}
+            </span>
+          )}
+        </button>
+        {showBell && <BellDropdown onClose={() => setShowBell(false)} />}
+      </div>
 
       {/* Guide launcher */}
       <GuideLauncher />

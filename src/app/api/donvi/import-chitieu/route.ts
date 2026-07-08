@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import ExcelJS from 'exceljs';
 import { handleApiError, requirePerm, json, ValidationError } from '@/server/api';
 import { getDb } from '@/db';
+import { notify } from '@/server/notify';
 
 export const dynamic = 'force-dynamic';
 
@@ -188,6 +189,9 @@ export async function POST(req: NextRequest) {
         updateChiTieu.run(row.total, dv.id);
       }
     })();
+
+    const userId = Number(session.sub);
+    notify({ userId, loai: 'ChiTieu', tieuDe: `Import chỉ tiêu hoàn tất (${parsed.length} đơn vị)`, lienKet: '/dashboard/chi-tieu' });
 
     return json({
       imported: parsed.length,
