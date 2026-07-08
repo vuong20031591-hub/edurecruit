@@ -115,6 +115,8 @@ interface KyForm {
   ngay_ket_thuc: string;
 }
 
+interface KyOption { id: number; ten_ky: string; nam: number; trang_thai: string; }
+
 export default function CaiDatSystemPage() {
   const router = useRouter();
   const { data: topbar, refresh: refreshTopbar } = useTopbar();
@@ -124,6 +126,60 @@ export default function CaiDatSystemPage() {
   const [kyForm, setKyForm] = useState<KyForm>({ ten_ky: '', ngay_bat_dau: '', ngay_ket_thuc: '' });
   const [kyOriginal, setKyOriginal] = useState<KyForm>({ ten_ky: '', ngay_bat_dau: '', ngay_ket_thuc: '' });
   const [kySaving, setKySaving] = useState(false);
+  const [kyList, setKyList] = useState<KyOption[]>([]);
+  const [kyCreating, setKyCreating] = useState(false);
+  const [newKyName, setNewKyName] = useState('');
+  const [newKyNam, setNewKyNam] = useState(String(new Date().getFullYear()));
+  const [showCreateKy, setShowCreateKy] = useState(false);
+  const [switchingKy, setSwitchingKy] = useState(false);
+
+  const loadKyList = useCallback(async () => {
+    const r = await fetch('/api/ky-tuyendung');
+    const j = await r.json();
+    if (Array.isArray(j.data)) setKyList(j.data);
+  }, []);
+
+  useEffect(() => { loadKyList(); }, [loadKyList]);
+
+  async function handleCreateKy() {
+    if (!newKyName.trim()) { toast.error('Nhập tên kỳ'); return; }
+    setKyCreating(true);
+    try {
+      const res = await fetch('/api/ky-tuyendung', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ten_ky: newKyName.trim(), nam: Number(newKyNam) || new Date().getFullYear() }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error ?? 'Lỗi tạo kỳ');
+      toast.success('Đã tạo kỳ tuyển dụng mới');
+      setNewKyName('');
+      setShowCreateKy(false);
+      await loadKyList();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Lỗi tạo kỳ');
+    } finally {
+      setKyCreating(false);
+    }
+  }
+
+  async function handleSwitchKy(id: number) {
+    setSwitchingKy(true);
+    try {
+      const res = await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 'app.current_ky_id': String(id) }),
+      });
+      if (!res.ok) throw new Error('Lỗi chuyển kỳ');
+      toast.success('Đã chuyển kỳ tuyển dụng');
+      if (typeof refreshTopbar === 'function') refreshTopbar();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Lỗi chuyển kỳ');
+    } finally {
+      setSwitchingKy(false);
+    }
+  }
 
   // Local state — đọc từ DB, có thể thay đổi trước khi Lưu
   const [config, setConfig] = useState<ConfigMap>({});
@@ -309,91 +365,178 @@ export default function CaiDatSystemPage() {
 
       {/* ── Section 1: Thông tin kỳ tuyển dụng ────────────────────────── */}
       <Section icon={Calendar} title="Thông tin kỳ tuyển dụng" dataGuide="cai-dat-ky">
-        {!ky ? (
-          <p className="text-sm text-slate-400">Chưa có kỳ tuyển dụng nào. Vui lòng tạo kỳ trước.</p>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {/* Tên kỳ */}
-            <div>
-              <FieldLabel>Tên kỳ tuyển dụng <span className="text-red-500">*</span></FieldLabel>
-              <input
-                type="text"
-                value={kyForm.ten_ky}
-                onChange={e => setKyForm(f => ({ ...f, ten_ky: e.target.value }))}
-                placeholder="VD: Kỳ tuyển dụng viên chức 2025"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100"
-              />
-            </div>
+        <div className="flex flex-col gap-5">
 
-            {/* Ngày bắt đầu / kết thúc */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel>Ngày bắt đầu thi</FieldLabel>
-                <input
-                  type="date"
-                  value={kyForm.ngay_bat_dau?.slice(0, 10) ?? ''}
-                  onChange={e => setKyForm(f => ({ ...f, ngay_bat_dau: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100"
-                />
-              </div>
-              <div>
-                <FieldLabel>Ngày kết thúc thi</FieldLabel>
-                <input
-                  type="date"
-                  value={kyForm.ngay_ket_thuc?.slice(0, 10) ?? ''}
-                  onChange={e => setKyForm(f => ({ ...f, ngay_ket_thuc: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100"
-                />
-              </div>
-            </div>
-
-            {/* Sức chứa mặc định + Điểm đạt */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel>Số thí sinh tối đa / phòng</FieldLabel>
-                <input
-                  type="number"
-                  min={1} max={200}
-                  value={config['phong_thi.suc_chua_mac_dinh'] ?? '30'}
-                  onChange={e => patch('phong_thi.suc_chua_mac_dinh', e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100"
-                />
-              </div>
-              <div>
-                <FieldLabel>Điểm đạt tối thiểu (thang 10)</FieldLabel>
-                <input
-                  type="number"
-                  min={0} max={10} step={0.5}
-                  value={config['xet_tuyen.diem_dat'] ?? '5.0'}
-                  onChange={e => patch('xet_tuyen.diem_dat', e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100"
-                />
-              </div>
-            </div>
-
-            {/* Save kỳ tuyển dụng */}
-            <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
-              <Button
-                size="sm"
-                leftIcon={<Save size={13} />}
-                loading={kySaving}
-                disabled={!isKyDirty}
-                onClick={handleSaveKy}
+          {/* Danh sách kỳ + switch */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <FieldLabel>Tất cả kỳ tuyển dụng</FieldLabel>
+              <button
+                type="button"
+                onClick={() => setShowCreateKy(v => !v)}
+                className="text-xs text-brand-600 hover:text-brand-700 font-medium"
               >
-                Lưu thông tin kỳ
-              </Button>
-              {isKyDirty && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setKyForm({ ...kyOriginal })}
-                >
-                  Hủy
-                </Button>
-              )}
+                {showCreateKy ? 'Hủy' : '+ Tạo kỳ mới'}
+              </button>
             </div>
+
+            {kyList.length === 0 ? (
+              <p className="text-sm text-slate-400">Chưa có kỳ nào. Tạo kỳ đầu tiên bên dưới.</p>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {kyList.map(k => {
+                  const isActive = ky?.id === k.id;
+                  return (
+                    <div
+                      key={k.id}
+                      className={cn(
+                        'flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition-colors',
+                        isActive
+                          ? 'border-brand-200 bg-brand-50'
+                          : 'border-slate-100 bg-slate-50'
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <span className="font-medium text-slate-800 truncate">{k.ten_ky}</span>
+                        <span className="ml-2 text-xs text-slate-400">{k.nam}</span>
+                        {isActive && (
+                          <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
+                            <CheckCircle2 size={10} /> Đang dùng
+                          </span>
+                        )}
+                      </div>
+                      {!isActive && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          loading={switchingKy}
+                          onClick={() => handleSwitchKy(k.id)}
+                        >
+                          Đặt làm kỳ hiện tại
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Form tạo kỳ mới */}
+            {showCreateKy && (
+              <div className="mt-3 rounded-lg border border-dashed border-brand-200 bg-brand-50 p-3 flex flex-col gap-2">
+                <p className="text-xs font-semibold text-brand-700">Tạo kỳ tuyển dụng mới</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <div className="sm:col-span-2">
+                    <input
+                      type="text"
+                      placeholder="Tên kỳ (VD: Kỳ tuyển dụng 2026)"
+                      value={newKyName}
+                      onChange={e => setNewKyName(e.target.value)}
+                      className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="number"
+                      placeholder="Năm"
+                      value={newKyNam}
+                      onChange={e => setNewKyNam(e.target.value)}
+                      min={2000} max={2100}
+                      className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100"
+                    />
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  loading={kyCreating}
+                  onClick={handleCreateKy}
+                  className="self-start"
+                >
+                  Tạo kỳ
+                </Button>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Edit kỳ đang active */}
+          {ky && (
+            <div className="border-t border-slate-100 pt-4 flex flex-col gap-4">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Chỉnh sửa kỳ hiện tại</p>
+
+              <div>
+                <FieldLabel>Tên kỳ tuyển dụng <span className="text-red-500">*</span></FieldLabel>
+                <input
+                  type="text"
+                  value={kyForm.ten_ky}
+                  onChange={e => setKyForm(f => ({ ...f, ten_ky: e.target.value }))}
+                  placeholder="VD: Kỳ tuyển dụng viên chức 2025"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <FieldLabel>Ngày bắt đầu thi</FieldLabel>
+                  <input
+                    type="date"
+                    value={kyForm.ngay_bat_dau?.slice(0, 10) ?? ''}
+                    onChange={e => setKyForm(f => ({ ...f, ngay_bat_dau: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100"
+                  />
+                </div>
+                <div>
+                  <FieldLabel>Ngày kết thúc thi</FieldLabel>
+                  <input
+                    type="date"
+                    value={kyForm.ngay_ket_thuc?.slice(0, 10) ?? ''}
+                    onChange={e => setKyForm(f => ({ ...f, ngay_ket_thuc: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <FieldLabel>Số thí sinh tối đa / phòng</FieldLabel>
+                  <input
+                    type="number"
+                    min={1} max={200}
+                    value={config['phong_thi.suc_chua_mac_dinh'] ?? '30'}
+                    onChange={e => patch('phong_thi.suc_chua_mac_dinh', e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100"
+                  />
+                </div>
+                <div>
+                  <FieldLabel>Điểm đạt tối thiểu (thang 10)</FieldLabel>
+                  <input
+                    type="number"
+                    min={0} max={10} step={0.5}
+                    value={config['xet_tuyen.diem_dat'] ?? '5.0'}
+                    onChange={e => patch('xet_tuyen.diem_dat', e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                <Button
+                  size="sm"
+                  leftIcon={<Save size={13} />}
+                  loading={kySaving}
+                  disabled={!isKyDirty}
+                  onClick={handleSaveKy}
+                >
+                  Lưu thông tin kỳ
+                </Button>
+                {isKyDirty && (
+                  <Button variant="ghost" size="sm" onClick={() => setKyForm({ ...kyOriginal })}>
+                    Hủy
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </Section>
 
       {/* ── Section 2: Bảo mật & phân quyền ───────────────────────────── */}

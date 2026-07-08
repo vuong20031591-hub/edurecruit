@@ -57,6 +57,7 @@ export function DonViFormModal({ open, onOpenChange, kyId, editing, onSaved }: D
 
   const [allViTri, setAllViTri] = useState<ViTriOption[]>([]);
   const [subjectTargets, setSubjectTargets] = useState<Record<number, number>>({});
+  const [isImported, setIsImported] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -81,6 +82,7 @@ export function DonViFormModal({ open, onOpenChange, kyId, editing, onSaved }: D
                 targets[m.vitri_tuyendung_id] = m.so_luong_phan_bo;
               });
               setSubjectTargets(targets);
+              setIsImported(data.mappings.length > 0);
             }
           })
           .catch((err) => console.error('Lỗi khi tải chi tiết đơn vị:', err));
@@ -300,7 +302,14 @@ export function DonViFormModal({ open, onOpenChange, kyId, editing, onSaved }: D
 
             {form.cap_hoc ? (
               <div className="rounded-md border border-slate-200 bg-slate-50 p-4 space-y-3">
-                <h4 className="text-sm font-semibold text-slate-800">Chỉ tiêu theo môn học</h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-slate-800">Chỉ tiêu theo môn học</h4>
+                  {isImported && (
+                    <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">
+                      Dữ liệu được nạp qua Import chỉ tiêu
+                    </span>
+                  )}
+                </div>
                 {filteredViTri.length === 0 ? (
                   <p className="text-xs text-slate-500">
                     Không có vị trí tuyển dụng nào được cấu hình cho cấp học này trong kỳ hiện tại.
@@ -318,7 +327,8 @@ export function DonViFormModal({ open, onOpenChange, kyId, editing, onSaved }: D
                         <input
                           type="number"
                           min={0}
-                          className="w-20 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
+                          disabled={isImported}
+                          className="w-20 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                           value={subjectTargets[vt.id] ?? ''}
                           onChange={(e) => handleTargetChange(vt.id, e.target.value)}
                           placeholder="0"
