@@ -129,8 +129,8 @@ export const vitriRepository = {
     const stmt = db.prepare(`
       INSERT INTO vitri_tuyendung (
         ky_tuyendung_id, ma_vi_tri, mon, cap_hoc, loai_vi_tri,
-        so_luong, hinh_thuc_thi, diem_chuan, thu_tu_uu_tien_dong_diem, ghi_chu
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        so_luong, hinh_thuc_thi, diem_chuan, thu_tu_uu_tien_dong_diem, sbd_prefix, ghi_chu
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const info = stmt.run(
       data.ky_tuyendung_id,
@@ -142,6 +142,7 @@ export const vitriRepository = {
       data.hinh_thuc_thi,
       data.diem_chuan ?? null,
       data.thu_tu_uu_tien_dong_diem ?? null,
+      data.sbd_prefix ?? null,
       data.ghi_chu ?? null
     );
     return this.findById(Number(info.lastInsertRowid))!;
@@ -161,6 +162,7 @@ export const vitriRepository = {
       hinh_thuc_thi: 'hinh_thuc_thi',
       diem_chuan: 'diem_chuan',
       thu_tu_uu_tien_dong_diem: 'thu_tu_uu_tien_dong_diem',
+      sbd_prefix: 'sbd_prefix',
       ghi_chu: 'ghi_chu'
     };
 

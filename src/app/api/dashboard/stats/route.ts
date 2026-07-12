@@ -26,11 +26,17 @@ export async function GET(req: NextRequest) {
     await requireAuth(req);
     const db = getDb();
 
-    // 1. Kỳ hiện tại (lấy từ config hoặc kỳ mới nhất)
-    const cfgKy = db.prepare("SELECT value FROM system_config WHERE key = 'app.current_ky_id'").get() as { value: string } | undefined;
-    const ky = cfgKy
-      ? db.prepare('SELECT id, ten_ky, nam, ngay_bat_dau, ngay_ket_thuc FROM ky_tuyendung WHERE id = ?').get(Number(cfgKy.value)) as DashboardStats['ky']
-      : db.prepare('SELECT id, ten_ky, nam, ngay_bat_dau, ngay_ket_thuc FROM ky_tuyendung ORDER BY nam DESC, id DESC LIMIT 1').get() as DashboardStats['ky'];
+    // 1. Kỳ: ưu tiên ?ky_id param → config → mới nhất
+    const kyIdParam = req.nextUrl.searchParams.get('ky_id');
+    let ky: DashboardStats['ky'];
+    if (kyIdParam) {
+      ky = db.prepare('SELECT id, ten_ky, nam, ngay_bat_dau, ngay_ket_thuc FROM ky_tuyendung WHERE id = ?').get(Number(kyIdParam)) as DashboardStats['ky'];
+    } else {
+      const cfgKy = db.prepare("SELECT value FROM system_config WHERE key = 'app.current_ky_id'").get() as { value: string } | undefined;
+      ky = cfgKy
+        ? db.prepare('SELECT id, ten_ky, nam, ngay_bat_dau, ngay_ket_thuc FROM ky_tuyendung WHERE id = ?').get(Number(cfgKy.value)) as DashboardStats['ky']
+        : db.prepare('SELECT id, ten_ky, nam, ngay_bat_dau, ngay_ket_thuc FROM ky_tuyendung ORDER BY nam DESC, id DESC LIMIT 1').get() as DashboardStats['ky'];
+    }
 
     const kyId = ky?.id ?? 0;
 

@@ -349,10 +349,9 @@ export async function GET(req: NextRequest) {
         const monList = Array.from(new Set(pc.candidates.map(c => c.vi_tri).filter(Boolean)));
         const monStr = monList.join(', ');
         const HDR_COLS = 7; // A-G cho header org/HĐ (như mẫu A1:G1)
-        const tnr = (size: number, bold = false, underline = false, italic = false): Partial<ExcelJS.Font> => ({
+        const tnr = (size: number, bold = false, _underline = false, italic = false): Partial<ExcelJS.Font> => ({
           name: 'Times New Roman', size,
           ...(bold ? { bold } : {}),
-          ...(underline ? { underline: 'single' as const } : {}),
           ...(italic ? { italic } : {}),
         });
         const thin = { style: 'thin' as const };
@@ -436,7 +435,7 @@ export async function GET(req: NextRequest) {
           // col indexes: 0=STT,1=SBD,2=Họ,3=Tên,4=NgàySinh,5=GiớiTính,6=DânTộc,
           //              7=HộKhẩu,8=MônDựThi,9=ĐTưuTiên,10=ĐơnVị,11=GhiChú
           const vals: (number | string | Date | null)[] = [
-            i + 1, ts.sbd ? ts.sbd.replace(/^SBD-?/i, '') : '', ts.ho, ts.ten,
+            i + 1, ts.sbd ?? '', ts.ho, ts.ten,
             ts.ngay_sinh ? new Date(ts.ngay_sinh) : null,
             ts.gioi_tinh, ts.dan_toc ?? '', ts.ho_khau_thuong_tru ?? '',
             ts.vi_tri, uuTienVal, ts.don_vi, '',
@@ -483,7 +482,6 @@ export async function GET(req: NextRequest) {
       const today = new Date();
       const dateStr = `${diaDanh}, ngày ${today.getDate()} tháng ${today.getMonth() + 1} năm ${today.getFullYear()}`;
       const TNR = 'Times New Roman';
-      const UL = 'single' as const;
       const COLS = 6;
 
       for (const phong of phongs) {
@@ -521,25 +519,25 @@ export async function GET(req: NextRequest) {
         // Row 1: org name — A1:D1 merge, TNR 11, center, underline, black
         const r1 = mc(1, 1, 4);
         r1.value = orgName;
-        r1.font = { name: TNR, size: 11, underline: UL, color: { argb: 'FF000000' } };
+        r1.font = { name: TNR, size: 11, color: { argb: 'FF000000' } };
         r1.alignment = { horizontal: 'center', vertical: 'middle' };
         ws.getRow(1).height = 16;
 
         // Row 2: HĐ TDVC — A2:D2 merge, TNR 12 bold center underline; tên phòng F2 TNR 10 bold center underline
         const r2 = mc(2, 1, 4);
         r2.value = tenHdTdvc;
-        r2.font = { name: TNR, size: 12, bold: true, underline: UL };
+        r2.font = { name: TNR, size: 12, bold: true };
         r2.alignment = { horizontal: 'center', vertical: 'middle' };
         ws.getRow(2).height = 16;
         const r2f = g(2, 6);
         r2f.value = tenPhong.toUpperCase();
-        r2f.font = { name: TNR, size: 10, bold: true, underline: UL, color: { argb: 'FF000000' } };
+        r2f.font = { name: TNR, size: 10, bold: true, color: { argb: 'FF000000' } };
         r2f.alignment = { horizontal: 'center', vertical: 'middle' };
 
         // Row 3: tiêu đề — A3:F3 merge, TNR 14 bold center underline, border-bottom thin
         const r3 = mc(3, 1, COLS);
         r3.value = tieuDeDs;
-        r3.font = { name: TNR, size: 14, bold: true, underline: UL };
+        r3.font = { name: TNR, size: 14, bold: true };
         r3.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         r3.border = { bottom: { style: 'thin' } };
         ws.getRow(3).height = 36;
@@ -549,14 +547,14 @@ export async function GET(req: NextRequest) {
         // A4: border left+right+top, bold TNR 10 underline center
         const hA = g(hdr, 1);
         hA.value = 'STT';
-        hA.font = { name: TNR, size: 10, bold: true, underline: UL };
+        hA.font = { name: TNR, size: 10, bold: true };
         hA.alignment = { horizontal: 'center', vertical: 'middle' };
         hA.border = { left: { style: 'thin' }, right: { style: 'thin' }, top: { style: 'thin' } };
 
         // B4: border all, bold TNR 10 underline center, format @
         const hB = g(hdr, 2);
         hB.value = 'SBD';
-        hB.font = { name: TNR, size: 10, bold: true, underline: UL };
+        hB.font = { name: TNR, size: 10, bold: true };
         hB.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         hB.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
         hB.numFmt = '@';
@@ -565,7 +563,7 @@ export async function GET(req: NextRequest) {
         ws.mergeCells(hdr, 3, hdr, 4);
         const hC = g(hdr, 3);
         hC.value = 'Họ và tên';
-        hC.font = { name: TNR, size: 10, bold: true, underline: UL };
+        hC.font = { name: TNR, size: 10, bold: true };
         hC.alignment = { horizontal: 'center', vertical: 'middle' };
         hC.border = { left: { style: 'thin' }, top: { style: 'thin' } };
         g(hdr, 4).border = { right: { style: 'thin' }, top: { style: 'thin' } };
@@ -573,14 +571,14 @@ export async function GET(req: NextRequest) {
         // E4: Ngày sinh — border left+right+top wrap
         const hE = g(hdr, 5);
         hE.value = 'Ngày tháng\n năm sinh';
-        hE.font = { name: TNR, size: 10, bold: true, underline: UL };
+        hE.font = { name: TNR, size: 10, bold: true };
         hE.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         hE.border = { left: { style: 'thin' }, right: { style: 'thin' }, top: { style: 'thin' } };
 
         // F4: border all bold TNR 10 underline center
         const hF = g(hdr, 6);
         hF.value = 'Ghi chú';
-        hF.font = { name: TNR, size: 10, bold: true, underline: UL };
+        hF.font = { name: TNR, size: 10, bold: true };
         hF.alignment = { horizontal: 'center', vertical: 'middle' };
         hF.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
         ws.getRow(hdr).height = 30;
@@ -604,35 +602,35 @@ export async function GET(req: NextRequest) {
           const topB = i === 0 ? 'thin' : 'hair';
 
           const dA = g(r, 1); dA.value = i + 1;
-          dA.font = { name: TNR, size: 8, italic: true, underline: UL };
+          dA.font = { name: TNR, size: 8, italic: true };
           dA.alignment = { horizontal: 'center', vertical: 'middle' };
           dA.border = { top: { style: topB }, bottom: { style: 'hair' }, left: { style: 'thin' }, right: { style: 'thin' } };
 
-          const dB = g(r, 2); dB.value = ts.sbd ? ts.sbd.replace(/^SBD-?/i, '') : '';
-          dB.font = { name: TNR, size: 10, underline: UL };
+          const dB = g(r, 2); dB.value = ts.sbd ?? '';
+          dB.font = { name: TNR, size: 10 };
           dB.alignment = { horizontal: 'center', vertical: 'middle' };
           dB.border = { top: { style: topB }, bottom: { style: 'hair' }, left: { style: 'thin' }, right: { style: 'thin' } };
           dB.numFmt = '@';
 
           const dC = g(r, 3); dC.value = ts.ho;
-          dC.font = { name: TNR, size: 10, underline: UL };
+          dC.font = { name: TNR, size: 10 };
           dC.alignment = { horizontal: 'left', vertical: 'middle' };
           dC.border = { top: { style: topB }, bottom: { style: 'hair' }, left: { style: 'thin' } };
 
           const dD = g(r, 4); dD.value = ts.ten;
-          dD.font = { name: TNR, size: 10, underline: UL };
+          dD.font = { name: TNR, size: 10 };
           dD.alignment = { horizontal: 'left', vertical: 'middle' };
           dD.border = { top: { style: topB }, bottom: { style: 'hair' }, right: { style: 'thin' } };
 
           const dE = g(r, 5);
           dE.value = ts.ngay_sinh ? new Date(ts.ngay_sinh) : null;
-          dE.font = { name: TNR, size: 10, underline: UL };
+          dE.font = { name: TNR, size: 10 };
           dE.alignment = { horizontal: 'center', vertical: 'middle' };
           dE.border = { top: { style: topB }, bottom: { style: 'hair' }, left: { style: 'thin' }, right: { style: 'thin' } };
           dE.numFmt = 'dd/mm/yyyy';
 
           const dF = g(r, 6);
-          dF.font = { name: 'Calibri', size: 11, underline: UL };
+          dF.font = { name: 'Calibri', size: 11 };
           dF.border = { top: { style: topB }, bottom: { style: 'hair' }, left: { style: 'thin' }, right: { style: 'thin' } };
 
           ws.getRow(r).height = 18;
@@ -655,7 +653,7 @@ export async function GET(req: NextRequest) {
         ws.mergeCells(curRow, 1, curRow, 5);
         const ftr = g(curRow, 1);
         ftr.value = `Danh sách này gồm có ${thiSinhs.length} thí sinh./.`;
-        ftr.font = { name: 'Calibri', size: 11, underline: UL };
+        ftr.font = { name: 'Calibri', size: 11 };
         ftr.alignment = { horizontal: 'center', vertical: 'middle' };
         ws.getRow(curRow).height = 16;
         curRow++;
@@ -664,7 +662,7 @@ export async function GET(req: NextRequest) {
         ws.mergeCells(curRow, 4, curRow, COLS);
         const dateC = g(curRow, 4);
         dateC.value = dateStr;
-        dateC.font = { name: TNR, size: 11, italic: true, underline: UL };
+        dateC.font = { name: TNR, size: 11, italic: true };
         dateC.alignment = { horizontal: 'center', vertical: 'middle' };
         ws.getRow(curRow).height = 16;
         curRow++;
@@ -673,7 +671,7 @@ export async function GET(req: NextRequest) {
         ws.mergeCells(curRow, 4, curRow, COLS);
         const titC = g(curRow, 4);
         titC.value = `CHỦ TỊCH HĐTDVC NĂM ${namKy}`;
-        titC.font = { name: TNR, size: 11, bold: true, underline: UL };
+        titC.font = { name: TNR, size: 11, bold: true };
         titC.alignment = { horizontal: 'center', vertical: 'middle' };
         ws.getRow(curRow).height = 16;
         curRow++;

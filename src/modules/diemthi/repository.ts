@@ -33,6 +33,7 @@ export const diemthiRepository = {
         t.ho,
         t.ten,
         t.ho_ten,
+        t.dan_toc,
         p.ma_phong,
         kq.diem_uu_tien
       FROM diemthi dt

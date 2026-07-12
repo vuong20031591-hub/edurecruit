@@ -133,6 +133,11 @@ export const vitriService = {
     }
 
     validateThuTuUuTien(data.thu_tu_uu_tien_dong_diem);
+    if (data.sbd_prefix !== null && data.sbd_prefix !== undefined) {
+      if (!/^\d{2}$/.test(data.sbd_prefix)) {
+        throw new ValidationError('Mã prefix SBD phải là đúng 2 chữ số (00–99)');
+      }
+    }
 
     try {
       const created = vitriRepository.create({
@@ -194,6 +199,11 @@ export const vitriService = {
     }
     if (data.thu_tu_uu_tien_dong_diem !== undefined) {
       validateThuTuUuTien(data.thu_tu_uu_tien_dong_diem);
+    }
+    if (data.sbd_prefix !== undefined && data.sbd_prefix !== null) {
+      if (!/^\d{2}$/.test(data.sbd_prefix)) {
+        throw new ValidationError('Mã prefix SBD phải là đúng 2 chữ số (00–99)');
+      }
     }
 
     try {

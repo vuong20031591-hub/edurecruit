@@ -286,6 +286,29 @@ export const phongthiRepository = {
   autoSapXep(kyId: number): { assigned: number; skipped: number; warnings: string[]; assignments: Array<{ thisinh_id: number; phongthi_id: number; sbd: string }> } {
     const db = getDb();
 
+    // Kiểm tra sbd_prefix cho tất cả vị trí có thí sinh trong kỳ
+    const vitriRows = db.prepare(`
+      SELECT DISTINCT v.id, v.mon, v.cap_hoc, v.sbd_prefix
+      FROM vitri_tuyendung v
+      INNER JOIN thisinh t ON t.vi_tri_dang_ky_id = v.id
+      WHERE t.ky_tuyendung_id = ?
+        AND t.trang_thai_ho_so = 'HopLe'
+        AND t.is_profile_locked = 1
+        AND t.cccd IS NOT NULL AND t.cccd != ''
+    `).all(kyId) as { id: number; mon: string; cap_hoc: string; sbd_prefix: string | null }[];
+
+    const missingPrefix = vitriRows.filter(v => !v.sbd_prefix);
+    if (missingPrefix.length > 0) {
+      const names = missingPrefix.map(v => `"${v.mon} (${v.cap_hoc})"`).join(', ');
+      return {
+        assigned: 0, skipped: 0,
+        warnings: [`Các vị trí chưa có mã prefix SBD: ${names}. Vui lòng cấu hình sbd_prefix cho từng vị trí trước khi xếp phòng.`],
+        assignments: []
+      };
+    }
+
+    const prefixMap = new Map(vitriRows.map(v => [v.id, v.sbd_prefix!]));
+
     const candidates = db.prepare(`
       SELECT t.id, t.vi_tri_dang_ky_id, t.don_vi_du_tuyen_id, t.ho, t.ten
       FROM thisinh t
@@ -382,10 +405,13 @@ export const phongthiRepository = {
       }
 
       // 2. Gán SBD và xếp phòng
-      let sbdSeq = 0;
       const viTriIds = Array.from(new Set(candidates.map(c => c.vi_tri_dang_ky_id)));
 
       for (const viTriId of viTriIds) {
+        // Reset seq riêng cho mỗi vị trí
+        let sbdSeq = 0;
+        const prefix = prefixMap.get(viTriId)!;
+
         // Lấy danh sách thí sinh và phòng của vị trí này
         const candidatesForViTri = candidates.filter(c => c.vi_tri_dang_ky_id === viTriId);
         const roomsForViTri = rooms.filter(r => r.vi_tri_dang_ky_id === viTriId);
@@ -434,9 +460,9 @@ export const phongthiRepository = {
           const targetRoom = roomsForViTri[roomIdx];
           const rState = roomState.get(targetRoom.id)!;
 
-          // Gán SBD
+          // Gán SBD theo prefix của vị trí, seq reset trong nhóm
           sbdSeq++;
-          const sbd = `SBD-${String(sbdSeq).padStart(4, '0')}`;
+          const sbd = `${prefix}.${String(sbdSeq).padStart(3, '0')}`;
 
           // Persist
           updateThisinhSbd.run(sbd, ts.id);

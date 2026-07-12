@@ -20,11 +20,14 @@ function calcDTB(gk1: number | null, gk2: number | null): number | null {
   return Math.round((gk1 + gk2) / 2 * 100) / 100;
 }
 
-function calcTong(gk1: number | null, gk2: number | null, uuTien: number | null, danToc: number | null): number | null {
-  const dtb = calcDTB(gk1, gk2);
-  if (dtb == null) return null;
-  return Math.round((dtb + (uuTien ?? 0) + (danToc ?? 0)) * 100) / 100;
+// Kinh và Hoa không thuộc diện DTTS theo quy định
+function isDTTS(danToc: string | null): boolean {
+  if (!danToc) return false;
+  const lower = danToc.trim().toLowerCase();
+  return lower !== 'kinh' && lower !== 'hoa';
 }
+
+
 
 function statusBadge(row: DiemThiView) {
   if (row.trang_thai_nhap === 'DaKhoa') return { label: 'Đã khóa', cls: 'bg-slate-100 text-slate-600 border-slate-300' };
@@ -62,6 +65,8 @@ export default function NhapDiemPage() {
 
   // Inline edit debounce refs
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [savingIds, setSavingIds] = useState<Set<number>>(new Set());
+  const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
 
   // Phân quyền: chỉ ADMIN và LANH_DAO mới được khóa điểm (PRD §Architecture §2.3)
   const [canKhoa, setCanKhoa] = useState(false);
@@ -154,6 +159,10 @@ export default function NhapDiemPage() {
   function handleDiemChange(thiSinhId: number, field: 'diem_gk1' | 'diem_gk2', raw: string) {
     const val = raw === '' ? null : parseFloat(raw);
 
+    // Guard: không cho sửa nếu đã khóa
+    const currentRow = rows.find(r => r.thisinh_id === thiSinhId);
+    if (currentRow?.trang_thai_nhap === 'DaKhoa' || !canNhap) return;
+
     // Optimistic update local
     setRows(prev => prev.map(r =>
       r.thisinh_id === thiSinhId ? { ...r, [field]: val } : r
@@ -174,6 +183,8 @@ export default function NhapDiemPage() {
 
     const key = `${thiSinhId}-${field}`;
     clearTimeout(saveTimers.current[key]);
+    setSavingIds(prev => new Set(prev).add(thiSinhId));
+    setSavedIds(prev => { const s = new Set(prev); s.delete(thiSinhId); return s; });
     saveTimers.current[key] = setTimeout(async () => {
       try {
         const res = await fetch('/api/diemthi', {
@@ -184,13 +195,12 @@ export default function NhapDiemPage() {
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: 'Lỗi lưu điểm' }));
           toast.error(err.error ?? 'Lỗi lưu điểm');
-          // Revert — reload
           diemRes.refresh(); diemStatsRes.refresh();
         } else {
-          // Update row với data từ server (để diem_thi_giang được tính trigger)
           const saved = await res.json();
           setRows(prev => prev.map(r => r.thisinh_id === saved.thisinh_id ? { ...r, ...saved } : r));
-          // Cập nhật stats
+          setSavedIds(prev => new Set(prev).add(thiSinhId));
+          setTimeout(() => setSavedIds(prev => { const s = new Set(prev); s.delete(thiSinhId); return s; }), 1500);
           if (selectedPhongId) {
             const sr = await fetch(`/api/diemthi?phongthi_id=${selectedPhongId}&stats=true`, { cache: 'no-store' });
             if (sr.ok) setStats(await sr.json());
@@ -198,6 +208,8 @@ export default function NhapDiemPage() {
         }
       } catch {
         toast.error('Lỗi kết nối khi lưu điểm');
+      } finally {
+        setSavingIds(prev => { const s = new Set(prev); s.delete(thiSinhId); return s; });
       }
     }, 800);
   }
@@ -262,32 +274,6 @@ export default function NhapDiemPage() {
       }
     } catch {
       toast.error('Lỗi kết nối khi lưu điểm ưu tiên');
-    }
-  }
-
-  // ─── Điểm cộng dân tộc (onBlur → PUT /api/diemthi) ────────────────────
-
-  async function handleDanTocChange(thiSinhId: number, raw: string) {
-    const val = raw === '' ? null : parseFloat(raw);
-    if (val !== null && (isNaN(val) || val < 0 || val > 100)) return;
-
-    setRows(prev => prev.map(r =>
-      r.thisinh_id === thiSinhId ? { ...r, diem_dan_toc: val } : r
-    ));
-
-    try {
-      const res = await fetch('/api/diemthi', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ thisinh_id: thiSinhId, diem_dan_toc: val }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Lỗi lưu điểm dân tộc' }));
-        toast.error(err.error ?? 'Lỗi lưu điểm dân tộc');
-        diemRes.refresh(); diemStatsRes.refresh();
-      }
-    } catch {
-      toast.error('Lỗi kết nối khi lưu điểm dân tộc');
     }
   }
 
@@ -492,15 +478,18 @@ export default function NhapDiemPage() {
                 const isLocked = row.trang_thai_nhap === 'DaKhoa' || !canNhap;
                 const dtb = calcDTB(row.diem_gk1, row.diem_gk2);
                 const badge = statusBadge(row);
+                const isSaving = savingIds.has(row.thisinh_id);
+                const isSaved = savedIds.has(row.thisinh_id);
 
                 return (
                   <div
                     key={row.id}
                     id={`row-mobile-${row.thisinh_id}`}
                     className={cn(
-                      'px-4 py-3 space-y-3 transition-colors',
+                      'px-4 py-3 space-y-3 transition-colors duration-300',
                       isHighlighted && 'bg-blue-50 ring-2 ring-inset ring-blue-400',
-                      (row.vang_thi || row.bo_thi) && !isHighlighted && 'bg-orange-50/40',
+                      isSaved && !isHighlighted && 'bg-emerald-50/60',
+                      (row.vang_thi || row.bo_thi) && !isHighlighted && !isSaved && 'bg-orange-50/40',
                     )}
                   >
                     {/* Header */}
@@ -509,8 +498,10 @@ export default function NhapDiemPage() {
                         {row.sbd ?? row.thisinh_id}
                       </span>
                       <span className="text-sm text-slate-600 truncate">{row.ho_ten}</span>
-                      <span className={cn('ml-auto inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs whitespace-nowrap', badge.cls)}>
-                        {badge.label}
+                      <span className={cn('ml-auto inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs whitespace-nowrap',
+                        isSaving ? 'bg-amber-50 text-amber-600 border-amber-200' : isSaved ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : badge.cls
+                      )}>
+                        {isSaving ? 'Đang lưu...' : isSaved ? '✓ Đã lưu' : badge.label}
                       </span>
                     </div>
 
@@ -529,7 +520,9 @@ export default function NhapDiemPage() {
                             'px-2 py-2.5 text-base',
                             isLocked
                               ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                              : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200'
+                              : isSaving
+                                ? 'bg-white border-amber-400 text-slate-800 ring-1 ring-amber-200'
+                                : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200'
                           )}
                           onChange={e => handleDiemChange(row.thisinh_id, 'diem_gk1', e.target.value)}
                         />
@@ -547,7 +540,9 @@ export default function NhapDiemPage() {
                             'px-2 py-2.5 text-base',
                             isLocked
                               ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                              : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200'
+                              : isSaving
+                                ? 'bg-amber-50 border-amber-300 text-slate-800 focus:border-amber-400 focus:ring-1 focus:ring-amber-100'
+                                : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200'
                           )}
                           onChange={e => handleDiemChange(row.thisinh_id, 'diem_gk2', e.target.value)}
                         />
@@ -565,14 +560,14 @@ export default function NhapDiemPage() {
                       </div>
                     </div>
 
-                    {/* Ưu tiên + Dân tộc + Vắng/Bỏ row */}
+                    {/* Điểm ưu tiên + Vắng/Bỏ row */}
                     <div className="flex items-center gap-3">
-                      <label className="text-sm text-slate-500">Ưu tiên:</label>
+                      <label className="text-sm text-slate-500">Điểm ưu tiên:</label>
                       <input
                         type="text"
                         inputMode="decimal"
                         disabled={isLocked}
-                        defaultValue={row.diem_uu_tien != null ? String(row.diem_uu_tien) : ''}
+                        defaultValue={row.diem_uu_tien != null ? String(row.diem_uu_tien) : isDTTS(row.dan_toc) ? '5' : ''}
                         placeholder="—"
                         className={cn(
                           'w-16 rounded-lg border text-center text-sm outline-none transition-colors px-2 py-1.5',
@@ -586,27 +581,6 @@ export default function NhapDiemPage() {
                           const num = parseFloat(raw);
                           if (!isNaN(num) && num >= 0) handleUuTienChange(row.thisinh_id, raw);
                           else e.target.value = row.diem_uu_tien != null ? String(row.diem_uu_tien) : '';
-                        }}
-                      />
-                      <label className="text-sm text-slate-500">Dân tộc:</label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        disabled={isLocked}
-                        defaultValue={row.diem_dan_toc != null ? String(row.diem_dan_toc) : ''}
-                        placeholder="—"
-                        className={cn(
-                          'w-16 rounded-lg border text-center text-sm outline-none transition-colors px-2 py-1.5',
-                          isLocked
-                            ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                            : 'bg-violet-50 border-violet-200 text-violet-800 focus:border-violet-400 focus:ring-1 focus:ring-violet-100'
-                        )}
-                        onBlur={e => {
-                          const raw = e.target.value.trim();
-                          if (raw === '' || raw === String(row.diem_dan_toc ?? '')) return;
-                          const num = parseFloat(raw);
-                          if (!isNaN(num) && num >= 0) handleDanTocChange(row.thisinh_id, raw);
-                          else e.target.value = row.diem_dan_toc != null ? String(row.diem_dan_toc) : '';
                         }}
                       />
                       <div className="ml-auto flex items-center gap-3">
@@ -623,19 +597,6 @@ export default function NhapDiemPage() {
                           />
                           <span className="text-slate-500">Vắng</span>
                         </label>
-                        <label className={cn(
-                          'flex items-center gap-1.5 cursor-pointer text-sm select-none',
-                          isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:text-red-600'
-                        )}>
-                          <input
-                            type="checkbox"
-                            disabled={isLocked}
-                            checked={!!row.bo_thi}
-                            onChange={e => handleVangBoChange(row.thisinh_id, 'bo_thi', e.target.checked)}
-                            className="h-4 w-4 rounded border-slate-300 accent-red-500"
-                          />
-                          <span className="text-slate-500">Bỏ thi</span>
-                        </label>
                       </div>
                     </div>
                   </div>
@@ -646,7 +607,7 @@ export default function NhapDiemPage() {
             {/* ── Desktop Grid ── */}
             <div className="hidden lg:block overflow-x-auto">
             {/* Table header */}
-            <div className="grid bg-[#1d293d]" style={{ gridTemplateColumns: '110px 1fr 90px 90px 90px 90px 90px 110px 120px' }}>
+            <div className="grid bg-[#1d293d]" style={{ gridTemplateColumns: '110px 1fr 90px 90px 90px 90px 110px 120px' }}>
               <div className="px-4 py-3">
                 <span className="text-xs font-semibold tracking-wide text-slate-300 uppercase">SBD</span>
               </div>
@@ -667,11 +628,7 @@ export default function NhapDiemPage() {
                 <div className="text-[10px] text-slate-500 mt-0.5">Tự động tính</div>
               </div>
               <div className="px-4 py-3">
-                <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Ưu tiên</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Điểm cộng</div>
-              </div>
-              <div className="px-4 py-3">
-                <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Dân tộc</div>
+                <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Điểm ưu tiên</div>
                 <div className="text-[10px] text-slate-500 mt-0.5">Điểm cộng</div>
               </div>
               <div className="px-3 py-3">
@@ -687,20 +644,27 @@ export default function NhapDiemPage() {
             {rows.map((row, idx) => {
               const isHighlighted = highlightId === row.thisinh_id;
               const isLocked = row.trang_thai_nhap === 'DaKhoa' || !canNhap;
+              const isSaving = savingIds.has(row.thisinh_id);
+              const isSaved = savedIds.has(row.thisinh_id);
               const dtb = calcDTB(row.diem_gk1, row.diem_gk2);
-              const badge = statusBadge(row);
+              const badge = isSaving
+                ? { label: 'Đang lưu...', cls: 'bg-amber-50 text-amber-600 border-amber-200' }
+                : isSaved
+                ? { label: 'Đã lưu ✓', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+                : statusBadge(row);
 
               return (
                 <div
                   key={row.id}
                   id={`row-${row.thisinh_id}`}
                   className={cn(
-                    'grid border-b border-slate-100 transition-colors',
+                    'grid border-b border-slate-100 transition-colors duration-300',
                     idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60',
                     isHighlighted && 'bg-blue-50 ring-2 ring-inset ring-blue-400',
-                    (row.vang_thi || row.bo_thi) && !isHighlighted && 'bg-orange-50/40',
+                    isSaved && !isHighlighted && 'bg-emerald-50/40',
+                    (row.vang_thi || row.bo_thi) && !isHighlighted && !isSaved && 'bg-orange-50/40',
                   )}
-                  style={{ gridTemplateColumns: '110px 1fr 90px 90px 90px 90px 90px 110px 120px' }}
+                  style={{ gridTemplateColumns: '110px 1fr 90px 90px 90px 90px 110px 120px' }}
                 >
                   {/* SBD */}
                   <div className="px-4 py-3 flex items-center">
@@ -727,6 +691,8 @@ export default function NhapDiemPage() {
                         'px-2 py-1.5',
                         isLocked
                           ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                          : isSaving
+                          ? 'bg-amber-50 border-amber-300 text-slate-800'
                           : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200'
                       )}
                       onChange={e => handleDiemChange(row.thisinh_id, 'diem_gk1', e.target.value)}
@@ -746,6 +712,8 @@ export default function NhapDiemPage() {
                         'px-2 py-1.5',
                         isLocked
                           ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                          : isSaving
+                          ? 'bg-amber-50 border-amber-300 text-slate-800'
                           : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200'
                       )}
                       onChange={e => handleDiemChange(row.thisinh_id, 'diem_gk2', e.target.value)}
@@ -770,7 +738,7 @@ export default function NhapDiemPage() {
                       type="text"
                       inputMode="decimal"
                       disabled={isLocked}
-                      defaultValue={row.diem_uu_tien != null ? String(row.diem_uu_tien) : ''}
+                      defaultValue={row.diem_uu_tien != null ? String(row.diem_uu_tien) : (isDTTS(row.dan_toc) ? '5' : '')}
                       placeholder="—"
                       className={cn(
                         'w-full rounded-lg border text-center text-sm outline-none transition-colors px-2 py-1.5',
@@ -784,30 +752,6 @@ export default function NhapDiemPage() {
                         const num = parseFloat(raw);
                         if (!isNaN(num) && num >= 0) handleUuTienChange(row.thisinh_id, raw);
                         else e.target.value = row.diem_uu_tien != null ? String(row.diem_uu_tien) : '';
-                      }}
-                    />
-                  </div>
-
-                  {/* Điểm cộng dân tộc */}
-                  <div className="px-3 py-2.5 flex items-center">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      disabled={isLocked}
-                      defaultValue={row.diem_dan_toc != null ? String(row.diem_dan_toc) : ''}
-                      placeholder="—"
-                      className={cn(
-                        'w-full rounded-lg border text-center text-sm outline-none transition-colors px-2 py-1.5',
-                        isLocked
-                          ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                          : 'bg-teal-50 border-teal-200 text-teal-800 focus:border-teal-400 focus:ring-1 focus:ring-teal-100'
-                      )}
-                      onBlur={e => {
-                        const raw = e.target.value.trim();
-                        if (raw === '' || raw === String(row.diem_dan_toc ?? '')) return;
-                        const num = parseFloat(raw);
-                        if (!isNaN(num) && num >= 0) handleDanTocChange(row.thisinh_id, raw);
-                        else e.target.value = row.diem_dan_toc != null ? String(row.diem_dan_toc) : '';
                       }}
                     />
                   </div>
@@ -827,26 +771,25 @@ export default function NhapDiemPage() {
                       />
                       <span className="text-slate-500">Vắng</span>
                     </label>
-                    <label className={cn(
-                      'flex items-center gap-1 cursor-pointer text-xs select-none',
-                      isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:text-red-600'
-                    )}>
-                      <input
-                        type="checkbox"
-                        disabled={isLocked}
-                        checked={!!row.bo_thi}
-                        onChange={e => handleVangBoChange(row.thisinh_id, 'bo_thi', e.target.checked)}
-                        className="rounded border-slate-300 accent-red-500"
-                      />
-                      <span className="text-slate-500">Bỏ</span>
-                    </label>
                   </div>
 
                   {/* Status badge */}
                   <div className="px-4 py-3 flex items-center">
-                    <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs', badge.cls)}>
-                      {badge.label}
-                    </span>
+                    {isSaving ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs bg-amber-50 text-amber-600 border-amber-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                        Đang lưu
+                      </span>
+                    ) : (
+                      <span className={cn(
+                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
+                        isSaved && badge.label === 'Đã nhập'
+                          ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                          : badge.cls
+                      )}>
+                        {badge.label}
+                      </span>
+                    )}
                   </div>
                 </div>
               );

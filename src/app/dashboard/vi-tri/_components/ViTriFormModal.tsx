@@ -18,6 +18,7 @@ export interface ViTriView {
   diem_chuan: number | null;
   thu_tu_uu_tien_dong_diem: string | null;
   ghi_chu: string | null;
+  sbd_prefix: string | null;
   soThiSinh?: number;
   donViCount?: number;
   kyTen?: string;
@@ -39,6 +40,7 @@ interface FormState {
   so_luong: string;
   hinh_thuc_thi: HinhThucThiT;
   diem_chuan: string;
+  sbd_prefix: string;
   ghi_chu: string;
   thu_tu_uu_tien_dong_diem: string[];
 }
@@ -53,6 +55,7 @@ const EMPTY_FORM: FormState = {
   so_luong: '1',
   hinh_thuc_thi: 'Viet',
   diem_chuan: '',
+  sbd_prefix: '',
   ghi_chu: '',
   thu_tu_uu_tien_dong_diem: DEFAULT_PRIORITY_ORDER
 };
@@ -81,6 +84,7 @@ export function ViTriFormModal({ open, onClose, editing, kyId, onSaved }: ViTriF
           so_luong: String(editing.so_luong ?? 1),
           hinh_thuc_thi: editing.hinh_thuc_thi,
           diem_chuan: editing.diem_chuan === null || editing.diem_chuan === undefined ? '' : String(editing.diem_chuan),
+          sbd_prefix: editing.sbd_prefix ?? '',
           ghi_chu: editing.ghi_chu ?? '',
           thu_tu_uu_tien_dong_diem: priorities
         });
@@ -131,7 +135,8 @@ export function ViTriFormModal({ open, onClose, editing, kyId, onSaved }: ViTriF
         hinh_thuc_thi: form.hinh_thuc_thi,
         diem_chuan: form.diem_chuan.trim() === '' ? null : Number(form.diem_chuan),
         ghi_chu: form.ghi_chu.trim() || null,
-        thu_tu_uu_tien_dong_diem: JSON.stringify(form.thu_tu_uu_tien_dong_diem)
+        thu_tu_uu_tien_dong_diem: JSON.stringify(form.thu_tu_uu_tien_dong_diem),
+        sbd_prefix: form.sbd_prefix.trim() || null
       };
       if (!editing) {
         payload.ky_tuyendung_id = kyId;
@@ -199,6 +204,16 @@ export function ViTriFormModal({ open, onClose, editing, kyId, onSaved }: ViTriF
                 onChange={(e) => update('mon', e.target.value)}
                 error={fieldErrors.mon}
                 placeholder="VD: Toán, Ngữ văn, Vật lý..."
+                disabled={submitting}
+              />
+              <Input
+                label="Mã prefix SBD (2 chữ số)"
+                value={form.sbd_prefix}
+                onChange={(e) => update('sbd_prefix', e.target.value.replace(/\D/g, '').slice(0, 2))}
+                error={fieldErrors.sbd_prefix}
+                placeholder="VD: 05, 08"
+                hint="Prefix đầu số báo danh, VD: 05 → 05.001, 05.002..."
+                maxLength={2}
                 disabled={submitting}
               />
               <div className="grid grid-cols-2 gap-3">

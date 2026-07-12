@@ -23,6 +23,8 @@ export interface DiemThiView extends DiemThi {
   ten: string;
   /** Mã phòng thi */
   ma_phong: string | null;
+  /** Dân tộc thí sinh (để xác định DTTS, không hiển thị ở nhập điểm) */
+  dan_toc: string | null;
   /** Điểm ưu tiên từ bảng ketqua (nullable nếu chưa có ketqua record) */
   diem_uu_tien: number | null;
 }

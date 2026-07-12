@@ -23,8 +23,7 @@ export interface DashboardStatsData {
   positionBar: { name: string; value: number; full: string }[];
 }
 
-const KEY = 'dashboard:stats';
-const URL = '/api/dashboard/stats';
+const BASE_URL = '/api/dashboard/stats';
 
 const EMPTY: DashboardStatsData = {
   ky: null,
@@ -33,16 +32,24 @@ const EMPTY: DashboardStatsData = {
   positionBar: []
 };
 
-export function fetchDashboardStats(force = false): Promise<DashboardStatsData> {
-  return fetchCached<DashboardStatsData>(KEY, URL, { force, ttlMs: 5_000 });
+function cacheKey(kyId?: number) {
+  return kyId ? `dashboard:stats:${kyId}` : 'dashboard:stats';
 }
 
-export function refreshDashboardStats(): Promise<DashboardStatsData> {
-  invalidateCache(KEY);
-  return fetchDashboardStats(true);
+function apiUrl(kyId?: number) {
+  return kyId ? `${BASE_URL}?ky_id=${kyId}` : BASE_URL;
 }
 
-export function useDashboardStats() {
-  const result = useCachedFetch<DashboardStatsData>(KEY, URL, { ttlMs: 5_000 });
+export function fetchDashboardStats(force = false, kyId?: number): Promise<DashboardStatsData> {
+  return fetchCached<DashboardStatsData>(cacheKey(kyId), apiUrl(kyId), { force, ttlMs: 5_000 });
+}
+
+export function refreshDashboardStats(kyId?: number): Promise<DashboardStatsData> {
+  invalidateCache(cacheKey(kyId));
+  return fetchDashboardStats(true, kyId);
+}
+
+export function useDashboardStats(kyId?: number) {
+  const result = useCachedFetch<DashboardStatsData>(cacheKey(kyId), apiUrl(kyId), { ttlMs: 5_000 });
   return { ...result, data: result.data ?? EMPTY };
 }

@@ -70,6 +70,7 @@ export interface ViTriTuyenDung {
    * Confirmed không fix cứng (Anh Vũ, 18/06/2026)
    */
   thu_tu_uu_tien_dong_diem: string | null;
+  sbd_prefix: string | null;
   ghi_chu: string | null;
   created_at: string;
   updated_at: string;
