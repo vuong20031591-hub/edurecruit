@@ -97,12 +97,15 @@ export function dbInfo(): {
   path: string;
   encrypted: boolean;
   wal: boolean;
+  vitri_columns: string[];
 } {
   const db = getDb();
   const wal = db.pragma('journal_mode', { simple: true });
+  const cols = db.prepare("PRAGMA table_info(vitri_tuyendung)").all() as { name: string }[];
   return {
     path: resolveDbPath(),
     encrypted: !!process.env.DB_KEY,
-    wal: wal === 'wal'
+    wal: wal === 'wal',
+    vitri_columns: cols.map(c => c.name)
   };
 }
