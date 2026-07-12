@@ -42,6 +42,17 @@ export async function POST(req: NextRequest) {
 
     const parsed = parseWorksheet(worksheet);
     if (parsed.format === 'unknown') {
+      console.log('--- EXCEL FORMAT DETECTION FAILED ---');
+      console.log('Sheet Name:', worksheet.name);
+      for (let r = 1; r <= Math.min(15, worksheet.actualRowCount); r++) {
+        const row = worksheet.getRow(r);
+        const cells = [];
+        for (let c = 1; c <= 20; c++) {
+          cells.push(row.getCell(c).value);
+        }
+        console.log(`Row ${r}:`, JSON.stringify(cells));
+      }
+      console.log('-------------------------------------');
       return json({
         error: parsed.warnings[0] ?? 'Không nhận diện được định dạng file',
         hint: 'Hỗ trợ: (1) Phiếu đăng ký từ Google Form, (2) DS DU THI.'

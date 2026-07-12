@@ -9,84 +9,59 @@ import { TrangThaiHoSoLabel, KetQuaLabel, type TrangThaiHoSoValue } from '@/shar
  * Xuất file Excel cho trang Báo cáo
  */
 function getPhongChoAssignments(db: any, kyId: number) {
-  const candidates = db.prepare(`
-    SELECT t.id, t.ho, t.ten, t.ho_ten, t.sbd, t.ngay_sinh, t.gioi_tinh,
-      t.dan_toc, t.ho_khau_thuong_tru, t.doi_tuong_uu_tien,
-      v.mon AS vi_tri, v.cap_hoc, d.ten_don_vi AS don_vi
-    FROM thisinh t
-    LEFT JOIN vitri_tuyendung v ON v.id = t.vi_tri_dang_ky_id
-    LEFT JOIN don_vi_tuyen_dung d ON d.id = t.don_vi_du_tuyen_id
-    WHERE t.ky_tuyendung_id = ?
-      AND t.trang_thai_ho_so = 'HopLe'
-      AND t.is_profile_locked = 1
-      AND t.cccd IS NOT NULL
-      AND t.cccd != ''
-    ORDER BY v.cap_hoc ASC, t.id ASC
-  `).all(kyId) as {
-    id: number; ho: string; ten: string; ho_ten: string; sbd: string | null;
-    ngay_sinh: string; gioi_tinh: string; dan_toc: string | null;
-    ho_khau_thuong_tru: string | null; doi_tuong_uu_tien: string | null;
-    vi_tri: string; cap_hoc: string; don_vi: string;
-  }[];
+  // Lấy danh sách các phòng thi của kỳ tuyển dụng này
+  const phongs = db.prepare(`
+    SELECT p.id, p.ma_phong, p.ten_phong, v.mon AS vi_tri, v.cap_hoc
+    FROM phongthi p
+    LEFT JOIN vitri_tuyendung v ON v.id = p.vi_tri_dang_ky_id
+    WHERE p.ky_tuyendung_id = ?
+    ORDER BY p.ma_phong ASC
+  `).all(kyId) as { id: number; ma_phong: string; ten_phong: string | null; vi_tri: string | null; cap_hoc: string | null }[];
 
-  // Lấy sức chứa mặc định của phòng thi (config)
-  const configSucChua = db.prepare(`
-    SELECT value FROM system_config WHERE key = 'phong_thi.suc_chua_mac_dinh'
-  `).get() as { value: string } | undefined;
-  const maxCapacity = configSucChua ? Number(configSucChua.value) : 24; // Mặc định là 24 nếu không cấu hình
+  const phongChoList: { name: string; cap_hoc: string; candidates: any[] }[] = [];
+  const assignmentMap = new Map<number, string>();
 
-  // Nhóm theo cấp học
-  const byCapHoc = new Map<string, typeof candidates>();
-  for (const c of candidates) {
-    const cap = c.cap_hoc || 'KHAC';
-    if (!byCapHoc.has(cap)) byCapHoc.set(cap, []);
-    byCapHoc.get(cap)!.push(c);
-  }
+  for (const phong of phongs) {
+    const candidates = db.prepare(`
+      SELECT t.id, t.ho, t.ten, t.ho_ten, t.sbd, t.ngay_sinh, t.gioi_tinh,
+        t.dan_toc, t.ho_khau_thuong_tru, t.doi_tuong_uu_tien,
+        v.mon AS vi_tri, v.cap_hoc, d.ten_don_vi AS don_vi,
+        dt.diem_dan_toc, kq.diem_uu_tien,
+        p.ma_phong, p.ten_phong
+      FROM thisinh t
+      JOIN diemthi dt ON dt.thisinh_id = t.id
+      LEFT JOIN vitri_tuyendung v ON v.id = t.vi_tri_dang_ky_id
+      LEFT JOIN don_vi_tuyen_dung d ON d.id = t.don_vi_du_tuyen_id
+      LEFT JOIN ketqua kq ON kq.thisinh_id = t.id
+      LEFT JOIN phongthi p ON p.id = dt.phongthi_id
+      WHERE dt.phongthi_id = ?
+        AND t.trang_thai_ho_so = 'HopLe'
+        AND t.is_profile_locked = 1
+        AND t.cccd IS NOT NULL
+        AND t.cccd != ''
+      ORDER BY t.sbd ASC, t.ho_ten ASC
+    `).all(phong.id) as {
+      id: number; ho: string; ten: string; ho_ten: string; sbd: string | null;
+      ngay_sinh: string; gioi_tinh: string; dan_toc: string | null;
+      ho_khau_thuong_tru: string | null; doi_tuong_uu_tien: string | null;
+      vi_tri: string; cap_hoc: string; don_vi: string;
+      diem_dan_toc: number | null;
+      diem_uu_tien: number | null;
+      ma_phong: string | null;
+      ten_phong: string | null;
+    }[];
 
-  // Thuật toán xáo trộn ngẫu nhiên có seed cố định
-  function seededShuffle<T>(array: T[], seed: number): T[] {
-    const arr = [...array];
-    let currSeed = seed;
-    for (let i = arr.length - 1; i > 0; i--) {
-      const r = Math.sin(currSeed++) * 10000;
-      const randomValue = r - Math.floor(r);
-      const j = Math.floor(randomValue * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
-  }
-
-  const assignmentMap = new Map<number, string>(); // thisinh_id -> phong_cho_name
-  const phongChoList: { name: string; cap_hoc: string; candidates: typeof candidates }[] = [];
-
-  // Để đồng bộ seed qua các lần chạy, sử dụng kyId làm seed gốc
-  let globalSeed = kyId + 179;
-
-  // Lần lượt duyệt qua từng cấp học
-  const sortedCapHocs = Array.from(byCapHoc.keys()).sort();
-  for (const capHoc of sortedCapHocs) {
-    const list = byCapHoc.get(capHoc)!;
-    // Xáo trộn ngẫu nhiên danh sách thí sinh cùng cấp học
-    const shuffledList = seededShuffle(list, globalSeed);
-    // Cập nhật globalSeed để cấp học sau không trùng pattern xáo trộn của cấp học trước
-    globalSeed += shuffledList.length + 7;
-
-    // Chia vào các phòng chờ
-    let roomSeq = 1;
-    for (let i = 0; i < shuffledList.length; i += maxCapacity) {
-      const chunk = shuffledList.slice(i, i + maxCapacity);
-      const roomName = `Phòng chờ ${String(roomSeq).padStart(2, '0')} - Cấp ${capHoc}`;
-      
+    if (candidates.length > 0) {
+      const roomName = phong.ma_phong;
       phongChoList.push({
         name: roomName,
-        cap_hoc: capHoc,
-        candidates: chunk,
+        cap_hoc: phong.cap_hoc || '',
+        candidates: candidates,
       });
 
-      for (const ts of chunk) {
+      for (const ts of candidates) {
         assignmentMap.set(ts.id, roomName);
       }
-      roomSeq++;
     }
   }
 
@@ -362,8 +337,7 @@ export async function GET(req: NextRequest) {
 
       for (let pcIdx = 0; pcIdx < phongChoList.length; pcIdx++) {
         const pc = phongChoList[pcIdx];
-        const sheetSeq = String(pcIdx + 1);
-        const ws = wb.addWorksheet(`CHỜ ${sheetSeq}`.substring(0, 31));
+        const ws = wb.addWorksheet(pc.name.substring(0, 31));
 
         pColWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
         ws.pageSetup = {
@@ -395,7 +369,7 @@ export async function GET(req: NextRequest) {
         // Row 2: HĐ TDVC — A2:G2, center, TNR 12 bold underline
         ws.mergeCells(2, 1, 2, HDR_COLS);
         const cr2 = ws.getCell(2, 1);
-        cr2.value = `HỘI ĐỒNG TDVC NĂM ${namKyCho}`;
+        cr2.value = `HỘI ĐỒNG TDVC NĂM HỌC ${namKyCho - 1}-${namKyCho}`;
         cr2.font = tnr(12, true, true);
         cr2.alignment = { horizontal: 'center' };
         ws.getRow(2).height = 16;
@@ -406,7 +380,7 @@ export async function GET(req: NextRequest) {
         // Row 4: tiêu đề — A4:L4, center, wrap, TNR 12 bold underline
         ws.mergeCells(4, 1, 4, PCOLS);
         const cr4 = ws.getCell(4, 1);
-        cr4.value = `DANH SÁCH THÍ SINH PHÒNG CHỜ ${sheetSeq}\n(${monStr})`;
+        cr4.value = `DANH SÁCH THÍ SINH PHÒNG THI ${pc.name.toUpperCase()}\n(${monStr})`;
         cr4.font = tnr(12, true, true);
         cr4.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         ws.getRow(4).height = 36;
@@ -455,13 +429,17 @@ export async function GET(req: NextRequest) {
         // Data rows starting at row 9
         pc.candidates.forEach((ts, i) => {
           const r = 9 + i;
+          let uuTienVal = ts.doi_tuong_uu_tien ?? '';
+          if (!uuTienVal && ts.diem_dan_toc && ts.diem_dan_toc > 0) {
+            uuTienVal = 'DTTS';
+          }
           // col indexes: 0=STT,1=SBD,2=Họ,3=Tên,4=NgàySinh,5=GiớiTính,6=DânTộc,
           //              7=HộKhẩu,8=MônDựThi,9=ĐTưuTiên,10=ĐơnVị,11=GhiChú
           const vals: (number | string | Date | null)[] = [
-            i + 1, ts.sbd ?? '', ts.ho, ts.ten,
+            i + 1, ts.sbd ? ts.sbd.replace(/^SBD-?/i, '') : '', ts.ho, ts.ten,
             ts.ngay_sinh ? new Date(ts.ngay_sinh) : null,
             ts.gioi_tinh, ts.dan_toc ?? '', ts.ho_khau_thuong_tru ?? '',
-            ts.vi_tri, ts.doi_tuong_uu_tien ?? '', ts.don_vi, '',
+            ts.vi_tri, uuTienVal, ts.don_vi, '',
           ];
           const borderTop = i === 0 ? thin : hair;
           vals.forEach((v, ci) => {
@@ -480,7 +458,7 @@ export async function GET(req: NextRequest) {
     } else if (loai === 'niem-yet') {
       const kyRow = db.prepare(`SELECT ten_ky, nam FROM ky_tuyendung WHERE id = ?`).get(id) as { ten_ky: string; nam: number } | undefined;
       const namKy = kyRow?.nam ?? new Date().getFullYear();
-      const tenHdTdvc = `HỘI ĐỒNG TDVC NĂM ${namKy}`;
+      const tenHdTdvc = `HỘI ĐỒNG TDVC NĂM HỌC ${namKy - 1}-${namKy}`;
 
       const cfgOrgName = db.prepare(`SELECT value FROM system_config WHERE key = 'org.name'`).get() as { value: string } | undefined;
       const orgName = (cfgOrgName?.value ?? 'SỞ GIÁO DỤC VÀ ĐÀO TẠO').toUpperCase();
@@ -630,7 +608,7 @@ export async function GET(req: NextRequest) {
           dA.alignment = { horizontal: 'center', vertical: 'middle' };
           dA.border = { top: { style: topB }, bottom: { style: 'hair' }, left: { style: 'thin' }, right: { style: 'thin' } };
 
-          const dB = g(r, 2); dB.value = ts.sbd ?? '';
+          const dB = g(r, 2); dB.value = ts.sbd ? ts.sbd.replace(/^SBD-?/i, '') : '';
           dB.font = { name: TNR, size: 10, underline: UL };
           dB.alignment = { horizontal: 'center', vertical: 'middle' };
           dB.border = { top: { style: topB }, bottom: { style: 'hair' }, left: { style: 'thin' }, right: { style: 'thin' } };

@@ -13,8 +13,10 @@ interface ProgressChartProps {
   year?: string;
 }
 
-export function ProgressChart({ data, year = '2026' }: ProgressChartProps) {
-  const [y] = useState(year);
+const currentYear = new Date().getFullYear();
+const defaultSchoolYear = `${currentYear - 1}-${currentYear}`;
+
+export function ProgressChart({ data, year = defaultSchoolYear }: ProgressChartProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -33,7 +35,7 @@ export function ProgressChart({ data, year = '2026' }: ProgressChartProps) {
             <p className="mt-0.5 text-sm text-slate-500">Số lượng hồ sơ theo tháng</p>
           </div>
           <div className="rounded-full border border-brand-500 px-3 py-1 text-xs font-medium text-brand-500">
-            {y}
+            {year}
           </div>
         </div>
         <div className="mt-4 h-64 animate-pulse rounded-lg bg-slate-50" />
@@ -60,7 +62,7 @@ export function ProgressChart({ data, year = '2026' }: ProgressChartProps) {
           <p className="mt-0.5 text-sm text-slate-500">Số lượng hồ sơ theo tháng</p>
         </div>
         <div className="rounded-full border border-brand-500 px-3 py-1 text-xs font-medium text-brand-500">
-          {y}
+          {year}
         </div>
       </div>
 

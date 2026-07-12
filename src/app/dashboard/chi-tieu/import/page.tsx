@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, FileSpreadsheet, CheckCircle, AlertCircle, X, Loader2, Upload, Eye } from 'lucide-react';
+import { ArrowLeft, FileSpreadsheet, CheckCircle, AlertCircle, X, Loader2, Upload, Eye, Download } from 'lucide-react';
 import { PageHeader, Button, toast } from '@/shared/components';
 
 interface KyOption { id: number; ten_ky: string; nam: number; }
@@ -156,7 +156,7 @@ export default function ImportChiTieuPage() {
                 className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-100"
               >
                 {kyList.map(k => (
-                  <option key={k.id} value={k.id}>{k.ten_ky} ({k.nam})</option>
+                  <option key={k.id} value={k.id}>{k.ten_ky} ({k.nam - 1}-{k.nam})</option>
                 ))}
               </select>
             )}
@@ -179,11 +179,20 @@ export default function ImportChiTieuPage() {
             ].join(' ')}
           >
             <FileSpreadsheet size={40} className={dragging ? 'text-brand-500' : 'text-slate-400'} />
-            <div className="text-center">
+            <div className="text-center flex flex-col items-center">
               <p className="text-sm font-medium text-slate-700">
                 Kéo thả file vào đây hoặc <span className="text-brand-600">click để chọn</span>
               </p>
               <p className="mt-1 text-xs text-slate-400">Hỗ trợ .xlsx · Tối đa 10MB</p>
+              <a
+                href="/Chi tieu tuyen dung.xlsx"
+                download
+                onClick={(e) => e.stopPropagation()}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 shadow-sm hover:bg-brand-100 transition-colors"
+              >
+                <Download size={13} />
+                Tải file Excel mẫu
+              </a>
             </div>
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleInputChange} />
           </div>
@@ -442,6 +451,7 @@ export default function ImportChiTieuPage() {
               <li>Đã tạo đầy đủ <strong>Đơn vị tuyển dụng</strong> trong kỳ này (tên phải khớp chính xác).</li>
               <li>Đã tạo đầy đủ <strong>Vị trí tuyển dụng</strong> với tên môn khớp với cột trong file Excel.</li>
               <li>File Excel có cấu trúc: hàng 6 chứa tên môn, từ hàng 7 là dữ liệu đơn vị.</li>
+              <li>Sử dụng file Excel mẫu để nhập dữ liệu: <a href="/Chi tieu tuyen dung.xlsx" download className="font-semibold text-amber-900 underline hover:text-amber-950 inline-flex items-center gap-1"><Download size={12} /> Tải file mẫu tại đây</a>.</li>
             </ol>
           </div>
         )}

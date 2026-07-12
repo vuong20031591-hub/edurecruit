@@ -83,7 +83,7 @@ export default function DashboardOverviewPage() {
         <div data-guide="tongquan-charts" className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           <div className="lg:col-span-2">
             {progressChart.length > 0
-              ? <ProgressChart data={progressChart} year={ky ? String(ky.nam) : '2026'} />
+              ? <ProgressChart data={progressChart} year={ky ? `${ky.nam - 1}-${ky.nam}` : '2025-2026'} />
               : <EmptyChart title="Tiến độ tiếp nhận hồ sơ" description="Chưa có dữ liệu" />
             }
           </div>

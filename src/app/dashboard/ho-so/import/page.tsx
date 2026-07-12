@@ -279,6 +279,7 @@ export default function ImportExcelPage() {
     }
     setFile(f);
     setPreview(null);
+    setPreviewError(null);
     setImportResult(null);
   }
 
@@ -303,6 +304,7 @@ export default function ImportExcelPage() {
   function resetAll() {
     setFile(null);
     setPreview(null);
+    setPreviewError(null);
     setImportResult(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
@@ -342,10 +344,10 @@ export default function ImportExcelPage() {
 
   // Auto-preview khi file + kyId sẵn sàng
   useEffect(() => {
-    if (file && kyId && !previewing && !preview && !importResult) {
+    if (file && kyId && !previewing && !preview && !previewError && !importResult) {
       runPreview(file);
     }
-  }, [file, kyId, preview, previewing, importResult, runPreview]);
+  }, [file, kyId, preview, previewing, previewError, importResult, runPreview]);
 
   // ---- Confirm import (chỉ insert OK + warning) ----
   async function handleConfirmImport() {
@@ -408,7 +410,7 @@ export default function ImportExcelPage() {
         description="Tải lên file Excel danh sách thí sinh đăng ký dự tuyển"
       />
 
-      <div className="mx-auto max-w-4xl space-y-6 p-5">
+      <div className={['mx-auto space-y-6 p-5', preview ? 'max-w-7xl' : 'max-w-4xl'].join(' ')}>
         {/* Kỳ tuyển dụng */}
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center gap-2 text-sm">
@@ -586,7 +588,7 @@ export default function ImportExcelPage() {
                     <th className="px-2 py-2">Email</th>
                     <th className="min-w-[180px] px-2 py-2">Vị trí</th>
                     <th className="min-w-[160px] px-2 py-2">Đơn vị</th>
-                    <th className="w-40 px-2 py-2">Trạng thái</th>
+                    <th className="min-w-[280px] px-2 py-2">Trạng thái</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -639,8 +641,14 @@ export default function ImportExcelPage() {
                               {badge.label}
                             </div>
                             {r.message && (
-                              <p className="mt-0.5 text-[10px] leading-tight text-slate-500" title={r.message}>
-                                {r.message.length > 60 ? r.message.slice(0, 60) + '…' : r.message}
+                              <p
+                                className={[
+                                  'mt-1 text-[10px] leading-tight font-medium whitespace-normal break-words max-w-[260px]',
+                                  r.status === 'error' ? 'text-red-600' : 'text-amber-700'
+                                ].join(' ')}
+                                title={r.message}
+                              >
+                                {r.message}
                               </p>
                             )}
                           </td>

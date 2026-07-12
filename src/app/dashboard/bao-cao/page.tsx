@@ -242,7 +242,7 @@ export default function BaoCaoPage() {
             <div className="rounded-xl border border-slate-200 bg-white p-5">
               <div className="mb-4">
                 <h3 className="text-lg font-semibold text-slate-800">Tỷ lệ đỗ / trượt</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Toàn kỳ tuyển dụng {topbar.ky?.nam ?? ''}</p>
+                <p className="text-xs text-slate-500 mt-0.5">Toàn kỳ tuyển dụng {topbar.ky?.nam ? `${topbar.ky.nam - 1}-${topbar.ky.nam}` : ''}</p>
               </div>
               {pieData.length > 0 ? (
                 <div className="flex items-center gap-4">

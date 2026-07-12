@@ -82,7 +82,7 @@ export function SelectDropdown({
           selected ? 'text-slate-700' : 'text-slate-400',
         )}
       >
-        <span className="truncate">{displayLabel}</span>
+        <span className="truncate" title={displayLabel}>{displayLabel}</span>
         <ChevronDown
           size={14}
           className={cn(
@@ -110,6 +110,7 @@ export function SelectDropdown({
                 role="option"
                 aria-selected={isSelected}
                 onClick={() => { onChange(String(opt.value)); setOpen(false); }}
+                title={opt.label}
                 className={cn(
                   'flex cursor-pointer items-center justify-between px-3 py-2 text-sm',
                   isSelected

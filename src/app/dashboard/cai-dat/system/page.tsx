@@ -398,7 +398,7 @@ export default function CaiDatSystemPage() {
                     >
                       <div className="min-w-0">
                         <span className="font-medium text-slate-800 truncate">{k.ten_ky}</span>
-                        <span className="ml-2 text-xs text-slate-400">{k.nam}</span>
+                        <span className="ml-2 text-xs text-slate-400">({k.nam - 1}-{k.nam})</span>
                         {isActive && (
                           <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
                             <CheckCircle2 size={10} /> Đang dùng
@@ -429,7 +429,7 @@ export default function CaiDatSystemPage() {
                   <div className="sm:col-span-2">
                     <input
                       type="text"
-                      placeholder="Tên kỳ (VD: Kỳ tuyển dụng 2026)"
+                      placeholder="Tên kỳ (VD: Kỳ tuyển dụng 2025-2026)"
                       value={newKyName}
                       onChange={e => setNewKyName(e.target.value)}
                       className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100"
@@ -438,12 +438,17 @@ export default function CaiDatSystemPage() {
                   <div>
                     <input
                       type="number"
-                      placeholder="Năm"
+                      placeholder="Năm kết thúc (VD: 2026)"
                       value={newKyNam}
                       onChange={e => setNewKyNam(e.target.value)}
                       min={2000} max={2100}
                       className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100"
                     />
+                    {newKyNam && (
+                      <p className="mt-1 text-[10px] text-brand-600">
+                        Năm học: {Number(newKyNam) - 1}-{newKyNam}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <Button
@@ -469,7 +474,7 @@ export default function CaiDatSystemPage() {
                   type="text"
                   value={kyForm.ten_ky}
                   onChange={e => setKyForm(f => ({ ...f, ten_ky: e.target.value }))}
-                  placeholder="VD: Kỳ tuyển dụng viên chức 2025"
+                  placeholder="VD: Kỳ tuyển dụng viên chức 2025-2026"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100"
                 />
               </div>

@@ -801,12 +801,12 @@ export const hossoService = {
       // Warning: đơn vị dự tuyển không match DB
       const tenDonVi = rawR.ten_don_vi as string | null;
       if (tenDonVi && !donViList.some((d) => d.ten_don_vi.toLowerCase() === tenDonVi.toLowerCase())) {
-        warnings.push(`Đơn vị "${tenDonVi}" không khớp DB — sẽ lưu don_vi_du_tuyen_id = NULL`);
+        warnings.push(`Đơn vị "${tenDonVi}" không tồn tại trong danh sách đơn vị của kỳ này (sẽ bỏ qua liên kết đơn vị)`);
       }
       // Warning: vị trí NV2 không match
       const viTri2Ten = rawR.vi_tri_ten_2 as string | null;
       if (viTri2Ten && !matchViTriByLabel(viTri2Ten, vitriList)) {
-        warnings.push(`Vị trí NV2 "${viTri2Ten}" không khớp DB`);
+        warnings.push(`Vị trí NV2 "${viTri2Ten}" không tồn tại trong danh sách vị trí của kỳ này`);
       }
 
       // status
@@ -1016,9 +1016,7 @@ function validateImportRow(
       return true;
     });
     if (zodErrors.length > 0) {
-      errors.push(zodErrors[0].message);
-    } else {
-      errors.push('Dữ liệu không hợp lệ');
+      errors.push(zodErrors.map(e => e.message).join(' · '));
     }
   }
   const valid = parsed.success ? parsed.data : null;
@@ -1049,7 +1047,7 @@ function validateImportRow(
   // Lookup vị trí: nếu null → error
   if (row.vi_tri_dang_ky_id === null) {
     const tenVT = (rawRow as Record<string, unknown>).vi_tri_ten as string | null;
-    errors.push(`Vị trí "${tenVT ?? '(rỗng)'}" không tồn tại trong DB kỳ này — cần tạo trước khi import`);
+    errors.push(`Vị trí tuyển dụng "${tenVT ?? '(rỗng)'}" không tồn tại trong hệ thống của kỳ này (hãy tạo vị trí này trước)`);
   }
   // Lookup đơn vị: cho phép null (sẽ lưu don_vi_du_tuyen_id = NULL) — chỉ warning, không error
   // (giữ nguyên logic cũ: đơn vị không match DB vẫn import được, warning)
