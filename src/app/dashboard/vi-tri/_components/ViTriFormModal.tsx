@@ -111,7 +111,7 @@ export function ViTriFormModal({ open, onClose, editing, kyId, onSaved }: ViTriF
     if (!form.mon.trim()) errors.mon = 'Môn không được để trống';
     const soLuongNum = Number(form.so_luong);
     if (!Number.isFinite(soLuongNum) || soLuongNum <= 0) {
-      errors.so_luong = 'Số lượng phải > 0';
+      errors.so_luong = 'Tổng số chỉ tiêu phải > 0';
     }
     if (form.diem_chuan.trim() !== '') {
       const d = Number(form.diem_chuan);
@@ -240,7 +240,7 @@ export function ViTriFormModal({ open, onClose, editing, kyId, onSaved }: ViTriF
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Input
-                  label="Số lượng"
+                  label="Tổng số chỉ tiêu"
                   type="number"
                   min={1}
                   required

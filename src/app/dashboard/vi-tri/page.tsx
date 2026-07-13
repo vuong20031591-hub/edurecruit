@@ -229,7 +229,7 @@ export default function ViTriPage() {
                     <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-500">
                       <span>{HinhThucThiLabel[item.hinh_thuc_thi] ?? item.hinh_thuc_thi}</span>
                       <span>·</span>
-                      <span>Số lượng: {item.so_luong}</span>
+                      <span>Tổng số chỉ tiêu: {item.so_luong}</span>
                       <span>·</span>
                       <span>TS đã ĐK: {item.soThiSinh ?? 0}</span>
                     </div>
@@ -276,7 +276,7 @@ export default function ViTriPage() {
                       <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Môn</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Cấp học</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Hình thức thi</th>
-                      <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">Số lượng</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">Tổng số chỉ tiêu</th>
                       <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">Số TS đã ĐK</th>
                       <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">Số đơn vị</th>
                       <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-600 w-44">Thao tác</th>
@@ -517,7 +517,7 @@ function MapDonViModal({ target, kyId, onClose, onSaved }: MapDonViModalProps) {
                 Phân bổ chỉ tiêu theo đơn vị
               </Dialog.Title>
               <Dialog.Description className="mt-0.5 text-xs text-slate-500">
-                {target.ma_vi_tri} · {target.mon} · {CapHocLabel[target.cap_hoc] ?? target.cap_hoc} · Số lượng: {target.so_luong}
+                {target.ma_vi_tri} · {target.mon} · {CapHocLabel[target.cap_hoc] ?? target.cap_hoc} · Tổng số chỉ tiêu: {target.so_luong}
               </Dialog.Description>
             </div>
             <Dialog.Close asChild>

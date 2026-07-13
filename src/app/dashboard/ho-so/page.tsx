@@ -500,6 +500,17 @@ export default function HoSoListPage() {
   const hasData = data.data.length > 0;
   const showEmpty = !loading && !error && !hasData;
 
+  if (!kyId) {
+    return (
+      <div>
+        <PageHeader
+          title="Quản lý Hồ sơ"
+          description="Danh sách thí sinh đăng ký dự tuyển"
+        />
+      </div>
+    );
+  }
+
   return (
     <div>
       <PageHeader
