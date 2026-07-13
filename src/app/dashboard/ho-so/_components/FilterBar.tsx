@@ -8,12 +8,17 @@ import { buildViTriLabel } from '@/shared/lib/format';
 export interface ViTriOption { id: number; mon: string; cap_hoc: string; loai_vi_tri?: string; }
 export interface DonViOption { id: number; ten_don_vi: string; cap_hoc: string; }
 
+export interface KyOption { id: number; ten_ky: string; nam: number; }
+
 interface FilterBarProps {
   filter: ThiSinhFilter;
   onChange: (filter: ThiSinhFilter) => void;
   onReset: () => void;
   viTriList: ViTriOption[];
   donViList: DonViOption[];
+  kyList: KyOption[];
+  selectedKyId: number | null;
+  onKyChange: (id: number | null) => void;
 }
 
 const TRANG_THAI_OPTIONS: SelectOption[] = [
@@ -25,7 +30,16 @@ const TRANG_THAI_OPTIONS: SelectOption[] = [
   { value: TrangThaiHoSo.DaChinhSua, label: TrangThaiHoSoLabel.DaChinhSua },
 ];
 
-export function FilterBar({ filter, onChange, onReset, viTriList, donViList }: FilterBarProps) {
+export function FilterBar({
+  filter,
+  onChange,
+  onReset,
+  viTriList,
+  donViList,
+  kyList,
+  selectedKyId,
+  onKyChange,
+}: FilterBarProps) {
   function update(patch: Partial<ThiSinhFilter>) {
     onChange({ ...filter, ...patch, page: 1 });
   }
@@ -45,6 +59,14 @@ export function FilterBar({ filter, onChange, onReset, viTriList, donViList }: F
   const donViOptions: SelectOption[] = [
     { value: '', label: 'Tất cả đơn vị' },
     ...donViList.map(d => ({ value: d.id, label: d.ten_don_vi })),
+  ];
+
+  const kyOptions: SelectOption[] = [
+    { value: '', label: 'Chọn năm tuyển dụng' },
+    ...kyList.map(k => ({
+      value: k.id,
+      label: `Năm ${k.nam - 1}–${k.nam}`,
+    })),
   ];
 
   return (
@@ -75,7 +97,14 @@ export function FilterBar({ filter, onChange, onReset, viTriList, donViList }: F
       </div>
 
       {/* Filter dropdowns */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <SelectDropdown
+          value={selectedKyId ?? ''}
+          onChange={(v) => onKyChange(v ? Number(v) : null)}
+          options={kyOptions}
+          aria-label="Lọc theo năm tuyển dụng"
+        />
+
         <SelectDropdown
           value={(filter.trang_thai as string) ?? ''}
           onChange={(v) => update({ trang_thai: (v || undefined) as ThiSinhFilter['trang_thai'] })}

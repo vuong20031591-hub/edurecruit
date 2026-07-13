@@ -5,7 +5,7 @@ import { Plus, Upload, Download, RefreshCw, FileText, AlertCircle, Trash2 } from
 import { PageHeader, Button, Spinner, EmptyState, Modal, toast } from '@/shared/components';
 import { useTopbar } from '@/shared/hooks/useTopbar';
 import { usePageFetch } from '@/shared/hooks/usePageFetch';
-import { FilterBar, type ViTriOption, type DonViOption } from './_components/FilterBar';
+import { FilterBar, type ViTriOption, type DonViOption, type KyOption } from './_components/FilterBar';
 import { ThiSinhTable, type ThiSinhAction } from './_components/ThiSinhTable';
 import { Pagination } from './_components/Pagination';
 import type { PaginatedThiSinh, ThiSinhFilter, ThiSinhView } from '@/modules/hosso/types';
@@ -51,6 +51,22 @@ export default function HoSoListPage() {
   const { data: topbar } = useTopbar();
   const kyId = topbar.ky?.id ?? null;
 
+  const [kyList, setKyList] = useState<KyOption[]>([]);
+  const [selectedKyId, setSelectedKyId] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch('/api/ky-tuyendung')
+      .then(r => r.json())
+      .then(j => setKyList(j.data ?? []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (kyId && selectedKyId === null) {
+      setSelectedKyId(kyId);
+    }
+  }, [kyId, selectedKyId]);
+
   const [filter, setFilter] = useState<ThiSinhFilter>(DEFAULT_FILTER);
   const [data, setData] = useState<PaginatedThiSinh>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
@@ -75,12 +91,12 @@ export default function HoSoListPage() {
 
   // vitri/donvi options
   const vitriOptionsUrl = useMemo(
-    () => (kyId ? `/api/vitri?all=true&ky_tuyendung_id=${kyId}` : null),
-    [kyId]
+    () => (selectedKyId ? `/api/vitri?all=true&ky_tuyendung_id=${selectedKyId}` : null),
+    [selectedKyId]
   );
   const donviOptionsUrl = useMemo(
-    () => (kyId ? `/api/donvi?all=true&ky_tuyendung_id=${kyId}` : null),
-    [kyId]
+    () => (selectedKyId ? `/api/donvi?all=true&ky_tuyendung_id=${selectedKyId}` : null),
+    [selectedKyId]
   );
   const vitriOptsRes = usePageFetch<unknown>(vitriOptionsUrl, { fallback: null as unknown });
   const donviOptsRes = usePageFetch<unknown>(donviOptionsUrl, { fallback: null as unknown });
@@ -97,8 +113,8 @@ export default function HoSoListPage() {
 
   // List
   const listUrl = useMemo(
-    () => (kyId == null ? null : `/api/hosso?${buildQuery(filter, kyId)}`),
-    [filter, kyId]
+    () => (selectedKyId == null ? null : `/api/hosso?${buildQuery(filter, selectedKyId)}`),
+    [filter, selectedKyId]
   );
   const listRes = usePageFetch<PaginatedThiSinh>(listUrl, { fallback: EMPTY_DATA });
 
@@ -152,11 +168,11 @@ export default function HoSoListPage() {
   }
 
   async function handleDeleteAll() {
-    if (!kyId) { toast.warning('Chưa có kỳ tuyển dụng'); return; }
+    if (!selectedKyId) { toast.warning('Chưa có kỳ tuyển dụng'); return; }
     setDeleting(true);
     setDeleteConfirm(false);
     try {
-      const body: Record<string, unknown> = { ky_tuyendung_id: kyId };
+      const body: Record<string, unknown> = { ky_tuyendung_id: selectedKyId };
       if (selectedIds.length > 0) {
         body.ids = selectedIds;
       } else {
@@ -190,10 +206,10 @@ export default function HoSoListPage() {
   }
 
   async function handleExportExcel() {
-    if (!kyId) { toast.warning('Chưa có kỳ tuyển dụng'); return; }
+    if (!selectedKyId) { toast.warning('Chưa có kỳ tuyển dụng'); return; }
     setExporting(true);
     try {
-      const qs = buildQuery({ ...filter, page: 1, pageSize: 5000 }, kyId);
+      const qs = buildQuery({ ...filter, page: 1, pageSize: 5000 }, selectedKyId);
       const res = await fetch(`/api/hosso?${qs}`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Lỗi tải dữ liệu');
       const json = (await res.json()) as PaginatedThiSinh;
@@ -500,17 +516,6 @@ export default function HoSoListPage() {
   const hasData = data.data.length > 0;
   const showEmpty = !loading && !error && !hasData;
 
-  if (!kyId) {
-    return (
-      <div>
-        <PageHeader
-          title="Quản lý Hồ sơ"
-          description="Danh sách thí sinh đăng ký dự tuyển"
-        />
-      </div>
-    );
-  }
-
   return (
     <div>
       <PageHeader
@@ -522,90 +527,95 @@ export default function HoSoListPage() {
         {/* Toolbar card — theo Figma: buttons trái, filter phải */}
         <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
           {/* Hàng 1: Action buttons + Search inline */}
-          <div className="flex flex-wrap items-center gap-2">
-            {canCreate && (
-              <Button
-                variant="primary"
-                size="sm"
-                leftIcon={<Plus size={14} />}
-                onClick={() => router.push('/dashboard/ho-so/new')}
-              >
-                Thêm hồ sơ
-              </Button>
-            )}
-            {canCreate && (
-              <span data-guide="ho-so-import">
+          {selectedKyId && (
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {canCreate && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  leftIcon={<Plus size={14} />}
+                  onClick={() => router.push('/dashboard/ho-so/new')}
+                >
+                  Thêm hồ sơ
+                </Button>
+              )}
+              {canCreate && (
+                <span data-guide="ho-so-import">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    leftIcon={<Upload size={14} />}
+                    onClick={() => router.push('/dashboard/ho-so/import')}
+                  >
+                    Import Excel
+                  </Button>
+                </span>
+              )}
+              {canExport && (
                 <Button
                   variant="outline"
                   size="sm"
-                  leftIcon={<Upload size={14} />}
-                  onClick={() => router.push('/dashboard/ho-so/import')}
+                  leftIcon={<Download size={14} />}
+                  onClick={handleExportExcel}
+                  loading={exporting}
                 >
-                  Import Excel
+                  Xuất Excel
                 </Button>
-              </span>
-            )}
-            {canExport && (
+              )}
               <Button
                 variant="outline"
                 size="sm"
-                leftIcon={<Download size={14} />}
-                onClick={handleExportExcel}
-                loading={exporting}
+                leftIcon={<RefreshCw size={14} className={loading || exporting ? 'animate-spin' : ''} />}
+                onClick={handleRefresh}
+                disabled={loading || exporting}
               >
-                Xuất Excel
+                Làm mới
               </Button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<RefreshCw size={14} className={loading || exporting ? 'animate-spin' : ''} />}
-              onClick={handleRefresh}
-              disabled={loading || exporting}
-            >
-              Làm mới
-            </Button>
-            {canDelete && selectedIds.length > 0 && (
-              <>
-                <span className="inline-flex items-center gap-1.5 rounded-md border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700">
-                  Đã chọn {selectedIds.length}/{data.data.length} trang này
-                  <button
-                    type="button"
-                    onClick={() => setSelectedIds([])}
-                    className="ml-1 text-brand-500 hover:text-brand-700"
-                    aria-label="Bỏ chọn"
-                    title="Bỏ chọn tất cả"
+              {canDelete && selectedIds.length > 0 && (
+                <>
+                  <span className="inline-flex items-center gap-1.5 rounded-md border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700">
+                    Đã chọn {selectedIds.length}/{data.data.length} trang này
+                    <button
+                      type="button"
+                      onClick={() => setSelectedIds([])}
+                      className="ml-1 text-brand-500 hover:text-brand-700"
+                      aria-label="Bỏ chọn"
+                      title="Bỏ chọn tất cả"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    leftIcon={<Trash2 size={14} />}
+                    onClick={handleConfirmDelete}
+                    disabled={deleting || loading}
+                    loading={deleting}
                   >
-                    ✕
-                  </button>
-                </span>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  leftIcon={<Trash2 size={14} />}
-                  onClick={handleConfirmDelete}
-                  disabled={deleting || loading}
-                  loading={deleting}
-                >
-                  {`Xóa (${selectedIds.length})`}
-                </Button>
-              </>
-            )}
-          </div>
+                    {`Xóa (${selectedIds.length})`}
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Hàng 2: FilterBar (search + dropdowns) */}
-          <div data-guide="ho-so-filter" className="mt-3">
+          <div data-guide="ho-so-filter">
             <FilterBar
               filter={filter}
               onChange={handleFilterChange}
               onReset={handleReset}
               viTriList={viTriList}
               donViList={donViList}
+              kyList={kyList}
+              selectedKyId={selectedKyId}
+              onKyChange={setSelectedKyId}
             />
           </div>
         </div>
 
-        {error && (
+        {selectedKyId && error && (
           <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             <AlertCircle size={16} className="mt-0.5 shrink-0" />
             <div>
@@ -615,49 +625,51 @@ export default function HoSoListPage() {
           </div>
         )}
 
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-          {loading && !hasData ? (
-            <div className="flex h-48 items-center justify-center">
-              <Spinner size={24} className="text-brand-500" />
-            </div>
-          ) : showEmpty ? (
-            <EmptyState
-              icon={<FileText size={48} className="text-slate-300" />}
-              title="Chưa có hồ sơ nào"
-              description="Import từ Excel hoặc thêm thủ công để bắt đầu quản lý hồ sơ thí sinh."
-              action={
-                <Button
-                  variant="primary"
-                  size="sm"
-                  leftIcon={<Upload size={14} />}
-                  onClick={() => router.push('/dashboard/ho-so/import')}
-                >
-                  Import Excel
-                </Button>
-              }
-            />
-          ) : (
-            <div data-guide="ho-so-list">
-              <ThiSinhTable
-                data={data.data as ThiSinhView[]}
-                page={data.page}
-                pageSize={data.pageSize}
-                onRowClick={handleRowClick}
-                onAction={handleAction}
-                onSelectionChange={handleSelectionChange}
-                selectedIds={selectedIds}
-                canLock={quyen === 'ADMIN'}
+        {selectedKyId && (
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            {loading && !hasData ? (
+              <div className="flex h-48 items-center justify-center">
+                <Spinner size={24} className="text-brand-500" />
+              </div>
+            ) : showEmpty ? (
+              <EmptyState
+                icon={<FileText size={48} className="text-slate-300" />}
+                title="Chưa có hồ sơ nào"
+                description="Import từ Excel hoặc thêm thủ công để bắt đầu quản lý hồ sơ thí sinh."
+                action={
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    leftIcon={<Upload size={14} />}
+                    onClick={() => router.push('/dashboard/ho-so/import')}
+                  >
+                    Import Excel
+                  </Button>
+                }
               />
-              <Pagination
-                page={data.page}
-                pageSize={data.pageSize}
-                total={data.total}
-                onPageChange={handlePageChange}
-                onPageSizeChange={handlePageSizeChange}
-              />
-            </div>
-          )}
-        </div>
+            ) : (
+              <div data-guide="ho-so-list">
+                <ThiSinhTable
+                  data={data.data as ThiSinhView[]}
+                  page={data.page}
+                  pageSize={data.pageSize}
+                  onRowClick={handleRowClick}
+                  onAction={handleAction}
+                  onSelectionChange={handleSelectionChange}
+                  selectedIds={selectedIds}
+                  canLock={quyen === 'ADMIN'}
+                />
+                <Pagination
+                  page={data.page}
+                  pageSize={data.pageSize}
+                  total={data.total}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Confirm delete modal */}
