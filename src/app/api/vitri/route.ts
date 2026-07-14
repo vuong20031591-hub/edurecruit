@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { handleApiError, requireAuth, requirePerm, json } from '@/server/api';
+import { handleApiError, requireAuth, requirePerm, json, ValidationError } from '@/server/api';
 import { vitriService } from '@/modules/vitri/service';
 
 export const dynamic = 'force-dynamic';
@@ -14,8 +14,13 @@ export async function GET(req: NextRequest) {
       const data = await vitriService.listAllByKy(Number(kyId), session);
       return json({ data });
     }
+    // Paginated path BẮT BUỘC có ky_tuyendung_id — tránh silent fallback
+    // trả data gộp tất cả kỳ (vi phạm source of truth).
+    if (!kyId) {
+      throw new ValidationError('Thiếu ky_tuyendung_id — vị trí tuyển dụng phải lọc theo đúng kỳ đã chọn');
+    }
     const filter = {
-      ky_tuyendung_id: kyId ? Number(kyId) : undefined,
+      ky_tuyendung_id: Number(kyId),
       mon: sp.get('mon') || undefined,
       cap_hoc: (sp.get('cap_hoc') as any) || undefined,
       search: sp.get('search') || undefined,

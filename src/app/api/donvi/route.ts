@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { handleApiError, requireAuth, requirePerm, json } from '@/server/api';
+import { handleApiError, requireAuth, requirePerm, json, ValidationError } from '@/server/api';
 import { donviService } from '@/modules/donvi/service';
 import type { DonViFilter } from '@/modules/donvi/types';
 import type { CapHoc } from '@/db/schema';
@@ -20,13 +20,19 @@ export async function GET(req: NextRequest) {
       return json({ data });
     }
 
+    // Paginated path BẮT BUỘC có ky_tuyendung_id — tránh silent fallback
+    // trả data gộp tất cả kỳ (vi phạm source of truth).
+    if (!kyId) {
+      throw new ValidationError('Thiếu ky_tuyendung_id — đơn vị tuyển dụng phải lọc theo đúng kỳ đã chọn');
+    }
+
     const rawCapHoc = sp.get('cap_hoc');
     const capHoc = rawCapHoc && (VALID_CAP_HOC as string[]).includes(rawCapHoc)
       ? (rawCapHoc as CapHoc)
       : undefined;
 
     const filter: DonViFilter = {
-      ky_tuyendung_id: kyId ? Number(kyId) : undefined,
+      ky_tuyendung_id: Number(kyId),
       cap_hoc: capHoc,
       search: sp.get('search') || undefined,
       page: sp.get('page') ? Number(sp.get('page')) : 1,

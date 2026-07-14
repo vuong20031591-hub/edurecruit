@@ -27,6 +27,8 @@ interface Props {
   trangThai: string;
   ngayNopHoSo: string;
   maHoSo: string;
+  /** Kỳ tuyển dụng cần lấy vị trí/đơn vị. Bắt buộc — không fallback sang kỳ khác. */
+  kyId: number | null;
 }
 
 function statusBadgeVariant(status: string): 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'primary' {
@@ -40,7 +42,7 @@ function statusBadgeVariant(status: string): 'success' | 'warning' | 'danger' | 
   }
 }
 
-export function ThongTinDangKy({ form, onChange, editing, trangThai, ngayNopHoSo, maHoSo }: Props) {
+export function ThongTinDangKy({ form, onChange, editing, trangThai, ngayNopHoSo, maHoSo, kyId }: Props) {
   const [viTris, setViTris] = useState<ViTri[]>([]);
   const [donVis, setDonVis] = useState<DonVi[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,11 +50,18 @@ export function ThongTinDangKy({ form, onChange, editing, trangThai, ngayNopHoSo
   useEffect(() => {
     let alive = true;
     async function load() {
+      // Chưa có kyId → KHÔNG fetch, KHÔNG fallback sang kỳ khác
+      if (kyId == null) {
+        setViTris([]);
+        setDonVis([]);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         const [vtRes, dvRes] = await Promise.all([
-          fetch('/api/vitri', { cache: 'no-store' }),
-          fetch('/api/donvi', { cache: 'no-store' })
+          fetch(`/api/vitri?all=true&ky_tuyendung_id=${kyId}`, { cache: 'no-store' }),
+          fetch(`/api/donvi?all=true&ky_tuyendung_id=${kyId}`, { cache: 'no-store' })
         ]);
         const vtJson = vtRes.ok ? await vtRes.json() : { data: [] };
         const dvJson = dvRes.ok ? await dvRes.json() : { data: [] };
@@ -71,7 +80,7 @@ export function ThongTinDangKy({ form, onChange, editing, trangThai, ngayNopHoSo
     }
     load();
     return () => { alive = false; };
-  }, []);
+  }, [kyId]);
 
   return (
     <div className="space-y-4">

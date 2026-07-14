@@ -353,6 +353,7 @@ export default function HoSoDetailPage({ params }: { params: Promise<{ id: strin
               trangThai={ts?.trang_thai_ho_so ?? 'ChoRaSoat'}
               ngayNopHoSo={(ts?.ngay_nop_ho_so ?? '').slice(0, 10)}
               maHoSo={''}
+              kyId={ts?.ky_tuyendung_id ?? kyId}
             />
           </CardBody>
         </Card>
