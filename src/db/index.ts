@@ -105,7 +105,7 @@ export function dbInfo(): {
   const cols = db.prepare("PRAGMA table_info(vitri_tuyendung)").all() as { name: string }[];
   let migrations: string[] = [];
   try {
-    migrations = (db.prepare("SELECT name FROM migrations ORDER BY name").all() as { name: string }[]).map(r => r.name);
+    migrations = (db.prepare("SELECT name FROM _migrations ORDER BY name").all() as { name: string }[]).map(r => r.name);
   } catch { /* migrations table may not exist */ }
   return {
     path: resolveDbPath(),
