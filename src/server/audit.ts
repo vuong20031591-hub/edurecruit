@@ -30,6 +30,7 @@ export type AuditAction =
   | 'DELETE_DONVI'
   | 'NHAP_DIEM'
   | 'NHAP_DIEM_UU_TIEN'
+  | 'PREFILL_DIEM_UU_TIEN'
   | 'KHOA_DIEM'
   | 'XETTUYEN_TINH'
   | 'XETTUYEN_CHAY'

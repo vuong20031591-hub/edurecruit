@@ -4,7 +4,7 @@
  */
 import { getDb } from '@/db';
 import type { DiemThi } from '@/db/schema';
-import type { DiemThiFilter, DiemThiStats, DiemThiUpsert, DiemThiView, KhoaDiemResult } from './types';
+import type { DiemThiCompletionSummary, DiemThiFilter, DiemThiStats, DiemThiUpsert, DiemThiView, KhoaDiemResult } from './types';
 
 export const diemthiRepository = {
 
@@ -34,6 +34,7 @@ export const diemthiRepository = {
         t.ten,
         t.ho_ten,
         t.dan_toc,
+        t.doi_tuong_uu_tien,
         p.ma_phong,
         kq.diem_uu_tien
       FROM diemthi dt
@@ -209,6 +210,119 @@ export const diemthiRepository = {
 
   findByThiSinhIdRaw(thisinh_id: number): DiemThi | undefined {
     return getDb().prepare('SELECT * FROM diemthi WHERE thisinh_id = ?').get(thisinh_id) as DiemThi | undefined;
+  },
+
+  // ─── Tổng hợp hoàn tất nhập điểm theo kỳ ────────────────────────────────
+
+  getCompletionSummaryByKy(ky_tuyendung_id: number): DiemThiCompletionSummary {
+    const db = getDb();
+    const phongRows = db.prepare(`
+      SELECT
+        p.id AS phongthi_id,
+        p.ma_phong,
+        p.ten_phong,
+        COUNT(dt.id) AS tong,
+        COALESCE(SUM(CASE WHEN dt.trang_thai_nhap = 'DaNhap' THEN 1 ELSE 0 END), 0) AS daNhap,
+        COALESCE(SUM(CASE WHEN dt.trang_thai_nhap = 'DaKhoa' THEN 1 ELSE 0 END), 0) AS daKhoa,
+        COALESCE(SUM(CASE WHEN dt.trang_thai_nhap = 'ChuaNhap' THEN 1 ELSE 0 END), 0) AS chuaNhap,
+        COALESCE(SUM(dt.vang_thi), 0) AS vang,
+        COALESCE(SUM(dt.bo_thi), 0) AS bo
+      FROM phongthi p
+      LEFT JOIN diemthi dt ON dt.phongthi_id = p.id
+      WHERE p.ky_tuyendung_id = ?
+      GROUP BY p.id
+      ORDER BY p.ngay_thi ASC, p.gio_thi ASC, p.ma_phong ASC
+    `).all(ky_tuyendung_id) as Array<{
+      phongthi_id: number;
+      ma_phong: string;
+      ten_phong: string | null;
+      tong: number;
+      daNhap: number;
+      daKhoa: number;
+      chuaNhap: number;
+      vang: number;
+      bo: number;
+    }>;
+
+    const overall = phongRows.reduce(
+      (acc, r) => {
+        acc.tongThiSinh += r.tong;
+        acc.daNhap += r.daNhap;
+        acc.daKhoa += r.daKhoa;
+        acc.chuaNhap += r.chuaNhap;
+        acc.vang += r.vang;
+        acc.bo += r.bo;
+        return acc;
+      },
+      { tongThiSinh: 0, daNhap: 0, chuaNhap: 0, daKhoa: 0, vang: 0, bo: 0 }
+    );
+
+    return {
+      overall,
+      phongs: phongRows,
+    };
+  },
+
+  // ─── Prefill điểm ưu tiên từ hồ sơ đăng ký ───────────────────────────────
+
+  /**
+   * Lấy các thí sinh trong phòng chưa có điểm ưu tiên trong bảng ketqua.
+   */
+  listMissingUuTien(phongthi_id: number): Array<{
+    thisinh_id: number;
+    doi_tuong_uu_tien: string | null;
+    diem_thi_giang: number | null;
+    diem_dan_toc: number | null;
+  }> {
+    const rows = getDb().prepare(`
+      SELECT
+        dt.thisinh_id,
+        t.doi_tuong_uu_tien,
+        dt.diem_thi_giang,
+        dt.diem_dan_toc
+      FROM diemthi dt
+      JOIN thisinh t ON t.id = dt.thisinh_id
+      LEFT JOIN ketqua kq ON kq.thisinh_id = dt.thisinh_id
+      WHERE dt.phongthi_id = ?
+        AND kq.diem_uu_tien IS NULL
+    `).all(phongthi_id) as Array<{
+      thisinh_id: number;
+      doi_tuong_uu_tien: string | null;
+      diem_thi_giang: number | null;
+      diem_dan_toc: number | null;
+    }>;
+    return rows;
+  },
+
+  /**
+   * Upsert điểm ưu tiên cho 1 thí sinh, đồng thời sync diem_tong.
+   */
+  upsertKetquaUuTien(
+    thisinh_id: number,
+    diem_uu_tien: number,
+    userId: number
+  ): void {
+    const db = getDb();
+    const dt = db.prepare('SELECT diem_thi_giang, diem_dan_toc FROM diemthi WHERE thisinh_id = ?').get(thisinh_id) as
+      | { diem_thi_giang: number | null; diem_dan_toc: number | null }
+      | undefined;
+    const diemThiGiang = dt?.diem_thi_giang ?? null;
+    const diemDanToc = dt?.diem_dan_toc ?? 0;
+    const diemTong = (diemThiGiang ?? 0) + diem_uu_tien + diemDanToc;
+
+    const existing = db.prepare('SELECT id FROM ketqua WHERE thisinh_id = ?').get(thisinh_id);
+    if (!existing) {
+      db.prepare(`
+        INSERT INTO ketqua (thisinh_id, diem_thi_giang, diem_uu_tien, diem_tong, ket_qua, ngay_chay, nguoi_chay)
+        VALUES (?, ?, ?, ?, 'ChoXuLy', datetime('now'), ?)
+      `).run(thisinh_id, diemThiGiang, diem_uu_tien, diemTong, userId);
+    } else {
+      db.prepare(`
+        UPDATE ketqua
+        SET diem_uu_tien = ?, diem_tong = ?, updated_at = datetime('now')
+        WHERE thisinh_id = ?
+      `).run(diem_uu_tien, diemTong, thisinh_id);
+    }
   },
 };
 

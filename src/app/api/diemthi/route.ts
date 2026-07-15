@@ -5,6 +5,7 @@ import { diemthiService } from '@/modules/diemthi/service';
 // GET /api/diemthi?ky_tuyendung_id=X
 // GET /api/diemthi?phongthi_id=X
 // GET /api/diemthi?phongthi_id=X&stats=true
+// GET /api/diemthi?ky_tuyendung_id=X&completion=true  → tổng hợp hoàn tất theo phòng và toàn kỳ
 export async function GET(req: NextRequest) {
   try {
     const session = await requirePerm(req, 'diemthi.view');
@@ -12,6 +13,16 @@ export async function GET(req: NextRequest) {
     const kyId = sp.get('ky_tuyendung_id');
     const phongId = sp.get('phongthi_id');
     const statsOnly = sp.get('stats') === 'true';
+    const completionOnly = sp.get('completion') === 'true';
+
+    if (completionOnly) {
+      if (!kyId) {
+        const { ValidationError } = await import('@/server/api');
+        throw new ValidationError('Thiếu ky_tuyendung_id cho completion');
+      }
+      const summary = await diemthiService.getCompletionSummary(Number(kyId), session);
+      return json(summary);
+    }
 
     const filter = {
       ky_tuyendung_id: kyId ? Number(kyId) : undefined,

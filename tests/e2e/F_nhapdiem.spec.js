@@ -121,4 +121,101 @@ test.describe('Nhóm F - F5 Nhập điểm', () => {
     // storageState là nhapdiem, không có audit.xem
     expect((await page.request.get('/api/audit?limit=5')).status()).toBe(403);
   });
+
+  // ============================================================
+  // Nhóm mở rộng: Flow nhập điểm theo phòng + prefill + tổng hợp
+  // ============================================================
+
+  test('F13: API prefill điểm ưu tiên - tự điền từ hồ sơ đăng ký', async ({ page }) => {
+    const kyId = await getKyId(page);
+
+    // Tìm một phòng có thí sinh chưa có điểm ưu tiên và có doi_tuong_uu_tien
+    const phongList = await page.request.get(`/api/phongthi?ky_tuyendung_id=${kyId}`)
+      .then(r => r.json()).then(d => Array.isArray(d) ? d : (d.data ?? []));
+
+    let targetPhong = null;
+    let candidateBefore = null;
+
+    for (const phong of phongList) {
+      const rows = await page.request.get(`/api/diemthi?phongthi_id=${phong.id}`)
+        .then(r => r.json()).then(d => d.data ?? []);
+      candidateBefore = rows.find(r =>
+        (r.diem_uu_tien === null || r.diem_uu_tien === 0) &&
+        r.doi_tuong_uu_tien && String(r.doi_tuong_uu_tien).trim().length > 0
+      );
+      if (candidateBefore) {
+        targetPhong = phong;
+        break;
+      }
+    }
+
+    if (!candidateBefore) {
+      console.log('F13: No candidate with empty diem_uu_tien + non-empty doi_tuong_uu_tien, skip');
+      return;
+    }
+
+    const res = await page.request.post('/api/diemthi/uu-tien/prefill', {
+      data: { phongthi_id: targetPhong.id },
+    });
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.updated).toBeGreaterThanOrEqual(1);
+
+    // Xác minh điểm ưu tiên đã được gán
+    const rowsAfter = await page.request.get(`/api/diemthi?phongthi_id=${targetPhong.id}`)
+      .then(r => r.json()).then(d => d.data ?? []);
+    const candidateAfter = rowsAfter.find(r => r.thisinh_id === candidateBefore.thisinh_id);
+    expect(candidateAfter).toBeTruthy();
+    expect(candidateAfter.diem_uu_tien).toBeGreaterThan(0);
+  });
+
+  test('F14: API tổng hợp hoàn tất - trả đúng cấu trúc', async ({ page }) => {
+    const kyId = await getKyId(page);
+    const res = await page.request.get(`/api/diemthi?ky_tuyendung_id=${kyId}&completion=true`);
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveProperty('overall');
+    expect(body).toHaveProperty('phongs');
+    expect(body.overall).toHaveProperty('tongThiSinh');
+    expect(body.overall).toHaveProperty('daNhap');
+    expect(body.overall).toHaveProperty('daKhoa');
+    expect(body.overall).toHaveProperty('chuaNhap');
+    expect(body.overall).toHaveProperty('vang');
+    expect(body.overall).toHaveProperty('bo');
+    expect(Array.isArray(body.phongs)).toBe(true);
+    if (body.phongs.length > 0) {
+      const phong = body.phongs[0];
+      expect(phong).toHaveProperty('phongthi_id');
+      expect(phong).toHaveProperty('ma_phong');
+      expect(phong).toHaveProperty('tong');
+      expect(phong).toHaveProperty('daKhoa');
+    }
+  });
+
+  test('F15: UI - chọn Môn thi mới enable dropdown Phòng thi', async ({ page }) => {
+    await page.goto('/dashboard/nhap-diem');
+    await page.waitForLoadState('domcontentloaded');
+
+    const monSelect = page.getByRole('combobox', { name: 'Môn thi' });
+    const phongSelect = page.getByRole('combobox', { name: 'Phòng thi' });
+
+    await expect(monSelect).toBeVisible();
+    await expect(phongSelect).toBeVisible();
+
+    // Ban đầu phòng thi bị disable
+    await expect(phongSelect).toBeDisabled();
+
+    // Mở dropdown môn thi và chọn option đầu tiên (nếu có)
+    await monSelect.click();
+    const firstOption = page.getByRole('option').first();
+    if (await firstOption.isVisible().catch(() => false)) {
+      await firstOption.click();
+      await expect(phongSelect).toBeEnabled();
+      await phongSelect.click();
+      await expect(page.getByRole('option').first()).toBeVisible();
+    } else {
+      console.log('F15: Không có môn thi để chọn, skip');
+      await page.keyboard.press('Escape');
+    }
+  });
 });

@@ -25,6 +25,8 @@ export interface DiemThiView extends DiemThi {
   ma_phong: string | null;
   /** Dân tộc thí sinh (để xác định DTTS, không hiển thị ở nhập điểm) */
   dan_toc: string | null;
+  /** Đối tượng ưu tiên từ hồ sơ đăng ký (CSV/text) */
+  doi_tuong_uu_tien: string | null;
   /** Điểm ưu tiên từ bảng ketqua (nullable nếu chưa có ketqua record) */
   diem_uu_tien: number | null;
 }
@@ -60,4 +62,23 @@ export interface KhoaDiemPayload {
 export interface KhoaDiemResult {
   locked: number;
   skipped: number;
+}
+
+// ─── Tổng hợp hoàn tất nhập điểm ─────────────────────────────────────────────
+
+export interface PhongThiCompletion {
+  phongthi_id: number;
+  ma_phong: string;
+  ten_phong: string | null;
+  tong: number;
+  daNhap: number;
+  daKhoa: number;
+  chuaNhap: number;
+  vang: number;
+  bo: number;
+}
+
+export interface DiemThiCompletionSummary {
+  overall: DiemThiStats & { vang: number; bo: number };
+  phongs: PhongThiCompletion[];
 }

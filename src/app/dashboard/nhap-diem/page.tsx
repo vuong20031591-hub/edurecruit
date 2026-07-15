@@ -1,33 +1,30 @@
 'use client';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { Download, Lock, Search, RefreshCw, AlertTriangle } from 'lucide-react';
-import { PageHeader, Button, Spinner, SelectDropdown, toast } from '@/shared/components';
+import { Download, Lock, Search, RefreshCw, AlertTriangle, CheckCircle2, BarChart3 } from 'lucide-react';
+import { PageHeader, Button, Spinner, SelectDropdown, Modal, toast } from '@/shared/components';
 import { useTopbar } from '@/shared/hooks/useTopbar';
 import { usePageFetch } from '@/shared/hooks/usePageFetch';
-import type { DiemThiView, DiemThiStats } from '@/modules/diemthi/types';
+import type { DiemThiView, DiemThiStats, DiemThiCompletionSummary } from '@/modules/diemthi/types';
+import { buildViTriLabel } from '@/shared/lib/format';
 import { cn } from '@/shared/lib/cn';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface PhongOption { id: number; ma_phong: string; ten_phong: string | null; }
+interface ViTriOption {
+  id: number;
+  mon: string;
+  cap_hoc: string;
+  loai_vi_tri?: string;
+  label: string;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-
 function calcDTB(gk1: number | null, gk2: number | null): number | null {
-  // Đồng nhất với DB trigger: chỉ tính khi cả 2 NOT NULL
   if (gk1 == null || gk2 == null) return null;
   return Math.round((gk1 + gk2) / 2 * 100) / 100;
 }
-
-// Kinh và Hoa không thuộc diện DTTS theo quy định
-function isDTTS(danToc: string | null): boolean {
-  if (!danToc) return false;
-  const lower = danToc.trim().toLowerCase();
-  return lower !== 'kinh' && lower !== 'hoa';
-}
-
-
 
 function statusBadge(row: DiemThiView) {
   if (row.trang_thai_nhap === 'DaKhoa') return { label: 'Đã khóa', cls: 'bg-slate-100 text-slate-600 border-slate-300' };
@@ -35,7 +32,6 @@ function statusBadge(row: DiemThiView) {
   if (row.bo_thi) return { label: 'Bỏ thi', cls: 'bg-red-50 text-red-600 border-red-200' };
   const dtb = calcDTB(row.diem_gk1, row.diem_gk2);
   if (dtb == null) return { label: 'Chưa nhập', cls: 'bg-slate-100 text-slate-500 border-slate-200' };
-  // ponytail: no Đỗ/Trượt here — determined by quota ranking, not threshold
   return { label: 'Đã nhập', cls: 'bg-green-50 text-green-700 border-green-200' };
 }
 
@@ -44,6 +40,10 @@ function statusBadge(row: DiemThiView) {
 export default function NhapDiemPage() {
   const { data: topbar } = useTopbar();
   const kyId = topbar.ky?.id ?? null;
+
+  // Vị trí (môn + cấp)
+  const [vitriList, setVitriList] = useState<ViTriOption[]>([]);
+  const [selectedVitriId, setSelectedVitriId] = useState<number | null>(null);
 
   // Phòng thi
   const [phongList, setPhongList] = useState<PhongOption[]>([]);
@@ -63,14 +63,20 @@ export default function NhapDiemPage() {
   const [khoaConfirm, setKhoaConfirm] = useState(false);
   const [khoaBusy, setKhoaBusy] = useState(false);
 
+  // Prefill state
+  const [prefilling, setPrefilling] = useState(false);
+
+  // Completion summary
+  const [completion, setCompletion] = useState<DiemThiCompletionSummary | null>(null);
+  const [completionOpen, setCompletionOpen] = useState(false);
+
   // Inline edit debounce refs
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [savingIds, setSavingIds] = useState<Set<number>>(new Set());
   const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
 
-  // Phân quyền: chỉ ADMIN và LANH_DAO mới được khóa điểm (PRD §Architecture §2.3)
+  // Phân quyền
   const [canKhoa, setCanKhoa] = useState(false);
-  // LANH_DAO xem nhưng không nhập — chỉ ADMIN và TO_NHAP_DIEM nhập điểm
   const [canNhap, setCanNhap] = useState(true);
   useEffect(() => {
     fetch('/api/auth/me', { cache: 'no-store' })
@@ -83,12 +89,34 @@ export default function NhapDiemPage() {
       .catch(() => {});
   }, []);
 
-  // ─── Load phòng list ────────────────────────────────────────────────────
+  // ─── Load danh sách vị trí theo kỳ ────────────────────────────────────────
 
   useEffect(() => {
     if (!kyId) return;
     let alive = true;
-    fetch(`/api/phongthi?ky_tuyendung_id=${kyId}`, { cache: 'no-store' })
+    fetch(`/api/vitri?all=true&ky_tuyendung_id=${kyId}`, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : { data: [] })
+      .then(j => {
+        if (!alive) return;
+        const arr = Array.isArray(j) ? j : (j.data ?? []);
+        const list: ViTriOption[] = (arr as Array<{ id: number; mon: string; cap_hoc: string; loai_vi_tri?: string }>)
+          .map(v => ({ ...v, label: buildViTriLabel({ loai_vi_tri: v.loai_vi_tri ?? 'GiaoVien', mon: v.mon, cap_hoc: v.cap_hoc }) }));
+        setVitriList(list);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [kyId]);
+
+  // ─── Load phòng list theo kỳ + vị trí ─────────────────────────────────────
+
+  useEffect(() => {
+    if (!kyId || !selectedVitriId) {
+      setPhongList([]);
+      setSelectedPhongId(null);
+      return;
+    }
+    let alive = true;
+    fetch(`/api/phongthi?ky_tuyendung_id=${kyId}&vi_tri_dang_ky_id=${selectedVitriId}`, { cache: 'no-store' })
       .then(r => r.ok ? r.json() : { data: [] })
       .then(j => {
         if (!alive) return;
@@ -98,13 +126,13 @@ export default function NhapDiemPage() {
           ten_phong: p.ten_phong,
         }));
         setPhongList(list);
-        if (list.length > 0 && !selectedPhongId) setSelectedPhongId(list[0].id);
+        setSelectedPhongId(prev => (list.some(p => p.id === prev) ? prev : (list[0]?.id ?? null)));
       })
       .catch(() => {});
     return () => { alive = false; };
-  }, [kyId]);
+  }, [kyId, selectedVitriId]);
 
-  // ─── Load điểm list ─────────────────────────────────────────────────────
+  // ─── Load điểm list + prefill ─────────────────────────────────────────────
 
   const diemUrl = useMemo(
     () => (selectedPhongId ? `/api/diemthi?phongthi_id=${selectedPhongId}` : null),
@@ -131,10 +159,36 @@ export default function NhapDiemPage() {
   }, [diemStatsRes.data]);
 
   useEffect(() => {
-    if (diemRes.error || diemStatsRes.error) toast.error('Kh�ng t?i du?c d? li?u di?m');
+    if (diemRes.error || diemStatsRes.error) toast.error('Không tải được dữ liệu điểm');
   }, [diemRes.error, diemStatsRes.error]);
 
-  // ─── Fast Focus (SBD → Enter → highlight) ──────────────────────────────
+  // ─── Prefill điểm ưu tiên khi chọn phòng ──────────────────────────────────
+
+  useEffect(() => {
+    if (!selectedPhongId) return;
+    let alive = true;
+    setPrefilling(true);
+    fetch('/api/diemthi/uu-tien/prefill', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phongthi_id: selectedPhongId }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        if (!alive) return;
+        if (j && typeof j.updated === 'number' && j.updated > 0) {
+          toast.success(`Đã tự điền điểm ưu tiên cho ${j.updated} thí sinh`);
+          diemRes.refresh();
+          diemStatsRes.refresh();
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (alive) setPrefilling(false); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPhongId]);
+
+  // ─── Fast Focus (SBD → Enter → highlight) ─────────────────────────────────
 
   function handleSbdSearch(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key !== 'Enter') return;
@@ -154,21 +208,17 @@ export default function NhapDiemPage() {
     }
   }
 
-  // ─── Inline save (debounced 800ms) ──────────────────────────────────────
+  // ─── Inline save (debounced 800ms) ─────────────────────────────────────────
 
   function handleDiemChange(thiSinhId: number, field: 'diem_gk1' | 'diem_gk2', raw: string) {
     const val = raw === '' ? null : parseFloat(raw);
-
-    // Guard: không cho sửa nếu đã khóa
     const currentRow = rows.find(r => r.thisinh_id === thiSinhId);
     if (currentRow?.trang_thai_nhap === 'DaKhoa' || !canNhap) return;
 
-    // Optimistic update local
     setRows(prev => prev.map(r =>
       r.thisinh_id === thiSinhId ? { ...r, [field]: val } : r
     ));
 
-    // Kiểm tra cảnh báo chênh lệch GK1-GK2 > 15 (thang 100)
     setRows(prev => {
       const row = prev.find(r => r.thisinh_id === thiSinhId);
       if (row) {
@@ -214,15 +264,13 @@ export default function NhapDiemPage() {
     }, 800);
   }
 
-  // ─── Vắng/Bỏ thi toggle ─────────────────────────────────────────────────
+  // ─── Vắng/Bỏ thi toggle ───────────────────────────────────────────────────
 
   async function handleVangBoChange(thiSinhId: number, field: 'vang_thi' | 'bo_thi', checked: boolean) {
-    // Nếu check vắng thì clear bỏ thi và ngược lại (DB CHECK constraint)
     const patch: Record<string, unknown> = { thisinh_id: thiSinhId, [field]: checked };
     if (field === 'vang_thi' && checked) patch.bo_thi = false;
     if (field === 'bo_thi' && checked) patch.vang_thi = false;
 
-    // Optimistic update
     setRows(prev => prev.map(r => {
       if (r.thisinh_id !== thiSinhId) return r;
       const updated = { ...r, [field]: checked ? 1 : 0 };
@@ -244,19 +292,22 @@ export default function NhapDiemPage() {
       } else {
         const saved = await res.json();
         setRows(prev => prev.map(r => r.thisinh_id === saved.thisinh_id ? { ...r, ...saved } : r));
+        if (selectedPhongId) {
+          const sr = await fetch(`/api/diemthi?phongthi_id=${selectedPhongId}&stats=true`, { cache: 'no-store' });
+          if (sr.ok) setStats(await sr.json());
+        }
       }
     } catch {
       toast.error('Lỗi kết nối');
     }
   }
 
-  // ─── Điểm ưu tiên (onBlur → PUT /api/diemthi/uu-tien) ─────────────────
+  // ─── Điểm ưu tiên (onBlur → PUT /api/diemthi/uu-tien) ───────────────────
 
   async function handleUuTienChange(thiSinhId: number, raw: string) {
     const val = parseFloat(raw);
     if (isNaN(val) || val < 0) return;
 
-    // Optimistic update
     setRows(prev => prev.map(r =>
       r.thisinh_id === thiSinhId ? { ...r, diem_uu_tien: val } : r
     ));
@@ -277,7 +328,7 @@ export default function NhapDiemPage() {
     }
   }
 
-  // ─── Khóa điểm ──────────────────────────────────────────────────────────
+  // ─── Khóa điểm ────────────────────────────────────────────────────────────
 
   async function handleKhoaDiem() {
     if (!selectedPhongId) return;
@@ -293,6 +344,8 @@ export default function NhapDiemPage() {
         toast.success(`Đã khóa ${data.locked} điểm${data.skipped > 0 ? `, bỏ qua ${data.skipped} chưa nhập` : ''}`);
         diemRes.refresh();
         diemStatsRes.refresh();
+        // Cập nhật completion summary nếu đang mở
+        if (completion) loadCompletion();
       } else {
         toast.error(data.error ?? 'Lỗi khóa điểm');
       }
@@ -304,7 +357,42 @@ export default function NhapDiemPage() {
     }
   }
 
-  // ─── Xuất danh sách ─────────────────────────────────────────────────────
+  // ─── Tổng hợp hoàn tất ───────────────────────────────────────────────────
+
+  const loadCompletion = useCallback(async () => {
+    if (!kyId) return;
+    try {
+      const r = await fetch(`/api/diemthi?ky_tuyendung_id=${kyId}&completion=true`, { cache: 'no-store' });
+      if (r.ok) {
+        const data = await r.json();
+        setCompletion(data);
+      }
+    } catch {
+      // ignore
+    }
+  }, [kyId]);
+
+  async function handleXetDuyet() {
+    if (!kyId) return;
+    try {
+      const r = await fetch('/api/xettuyen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ky_tuyendung_id: kyId }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok) {
+        toast.success(`Đã xét duyệt: ${data.trung_tuyen_count ?? 0} trúng tuyển, ${data.du_phong_count ?? 0} dự phòng, ${data.khong_dat_count ?? 0} không đạt`);
+        setCompletionOpen(false);
+      } else {
+        toast.error(data.error ?? 'Lỗi xét duyệt');
+      }
+    } catch {
+      toast.error('Lỗi kết nối khi xét duyệt');
+    }
+  }
+
+  // ─── Xuất danh sách ───────────────────────────────────────────────────────
 
   async function handleExport() {
     if (!selectedPhongId || rows.length === 0) return;
@@ -348,7 +436,7 @@ export default function NhapDiemPage() {
     }
   }
 
-  // ─── Derived ────────────────────────────────────────────────────────────
+  // ─── Derived ──────────────────────────────────────────────────────────────
 
   const progressPct = stats.tongThiSinh > 0
     ? Math.round((stats.daNhap + stats.daKhoa) / stats.tongThiSinh * 100)
@@ -356,18 +444,35 @@ export default function NhapDiemPage() {
   const selectedPhong = phongList.find(p => p.id === selectedPhongId);
   const isAllLocked = stats.tongThiSinh > 0 && stats.daKhoa === stats.tongThiSinh;
 
-  // ─── Render ──────────────────────────────────────────────────────────────
+  const allRoomsReady = completion
+    ? completion.phongs.length > 0 && completion.phongs.every(p => p.tong > 0 && p.tong === p.daKhoa)
+    : false;
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col gap-4 p-5">
       <PageHeader
         title="Nhập điểm & Xét duyệt"
-        description="Chấm điểm thi — Quy trình ráp phách bảo mật"
+        description="Chấm điểm thi theo phòng thi — Quy trình ráp phách bảo mật"
       />
 
-      {/* ── Toolbar ─────────────────────────────────────────────────────── */}
+      {/* ── Toolbar ──────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
-        {/* Phòng thi dropdown */}
+        {/* Vị trí (môn + cấp) */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-slate-600 whitespace-nowrap">Môn thi:</span>
+          <SelectDropdown
+            value={selectedVitriId ? String(selectedVitriId) : ''}
+            onChange={v => setSelectedVitriId(v ? Number(v) : null)}
+            options={vitriList.map(v => ({ value: String(v.id), label: v.label }))}
+            placeholder="Chọn môn..."
+            className="w-60"
+            aria-label="Môn thi"
+          />
+        </div>
+
+        {/* Phòng thi */}
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-slate-600 whitespace-nowrap">Phòng thi:</span>
           <SelectDropdown
@@ -377,8 +482,10 @@ export default function NhapDiemPage() {
               value: String(p.id),
               label: p.ten_phong ? `${p.ma_phong} — ${p.ten_phong}` : p.ma_phong,
             }))}
-            placeholder="Chọn phòng..."
+            placeholder={selectedVitriId ? 'Chọn phòng...' : 'Chọn môn trước'}
             className="w-52"
+            disabled={!selectedVitriId || phongList.length === 0}
+            aria-label="Phòng thi"
           />
         </div>
 
@@ -397,18 +504,31 @@ export default function NhapDiemPage() {
                 style={{ width: `${progressPct}%` }}
               />
             </div>
+            {prefilling && (
+              <span className="text-xs text-amber-600 italic">đang prefill ưu tiên…</span>
+            )}
           </div>
         )}
 
-        {/* Spacer */}
         <div className="flex-1" />
+
+        {/* Tổng hợp hoàn tất */}
+        <Button
+          variant="outline"
+          size="sm"
+          leftIcon={<BarChart3 size={14} />}
+          onClick={() => { setCompletionOpen(true); loadCompletion(); }}
+          disabled={!kyId}
+        >
+          Tổng hợp hoàn tất
+        </Button>
 
         {/* Xuất danh sách */}
         <Button variant="outline" size="sm" leftIcon={<Download size={14} />} onClick={handleExport} disabled={rows.length === 0}>
           Xuất danh sách
         </Button>
 
-        {/* Khóa điểm — chỉ ADMIN và LANH_DAO */}
+        {/* Khóa điểm */}
         {canKhoa && (!khoaConfirm ? (
           <span data-guide="nhap-diem-khoa">
             <Button
@@ -430,13 +550,12 @@ export default function NhapDiemPage() {
           </div>
         ))}
 
-        {/* Làm mới */}
         <Button variant="ghost" size="sm" leftIcon={<RefreshCw size={14} />} onClick={() => { diemRes.refresh(); diemStatsRes.refresh(); }}>
           Làm mới
         </Button>
       </div>
 
-      {/* ── Fast Focus Banner ───────────────────────────────────────────── */}
+      {/* ── Fast Focus Banner ─────────────────────────────────────────────── */}
       <div data-guide="nhap-diem-search" className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
         <Search size={18} className="text-blue-500 shrink-0" />
         <input
@@ -462,11 +581,11 @@ export default function NhapDiemPage() {
       {/* ── Table ───────────────────────────────────────────────────────── */}
       <div data-guide="nhap-diem-grid" className="rounded-xl border border-slate-200 bg-white overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Spinner />
-          </div>
+          <div className="flex items-center justify-center py-16"><Spinner /></div>
+        ) : !selectedVitriId ? (
+          <div className="py-16 text-center text-slate-400 text-sm">Vui lòng chọn môn thi trước</div>
         ) : !selectedPhongId ? (
-          <div className="py-16 text-center text-slate-400 text-sm">Chọn phòng thi để xem danh sách</div>
+          <div className="py-16 text-center text-slate-400 text-sm">Vui lòng chọn phòng thi</div>
         ) : rows.length === 0 ? (
           <div className="py-16 text-center text-slate-400 text-sm">Phòng thi chưa có thí sinh nào được xếp</div>
         ) : (
@@ -492,7 +611,6 @@ export default function NhapDiemPage() {
                       (row.vang_thi || row.bo_thi) && !isHighlighted && !isSaved && 'bg-orange-50/40',
                     )}
                   >
-                    {/* Header */}
                     <div className="flex items-center gap-2">
                       <span className="inline-flex items-center rounded px-2 py-0.5 bg-[#1d293d] text-slate-200 text-xs font-bold font-mono">
                         {row.sbd ?? row.thisinh_id}
@@ -505,7 +623,6 @@ export default function NhapDiemPage() {
                       </span>
                     </div>
 
-                    {/* Inputs row */}
                     <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="block text-[10px] font-semibold text-slate-400 mb-1 uppercase">GK 1</label>
@@ -516,13 +633,10 @@ export default function NhapDiemPage() {
                           value={row.diem_gk1 ?? ''}
                           placeholder="0–100"
                           className={cn(
-                            'w-full rounded-lg border text-center outline-none transition-colors',
-                            'px-2 py-2.5 text-base',
-                            isLocked
-                              ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                              : isSaving
-                                ? 'bg-white border-amber-400 text-slate-800 ring-1 ring-amber-200'
-                                : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200'
+                            'w-full rounded-lg border text-center outline-none transition-colors px-2 py-2.5 text-base',
+                            isLocked ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                              : isSaving ? 'bg-white border-amber-400 text-slate-800 ring-1 ring-amber-200'
+                              : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200'
                           )}
                           onChange={e => handleDiemChange(row.thisinh_id, 'diem_gk1', e.target.value)}
                         />
@@ -536,13 +650,10 @@ export default function NhapDiemPage() {
                           value={row.diem_gk2 ?? ''}
                           placeholder="0–100"
                           className={cn(
-                            'w-full rounded-lg border text-center outline-none transition-colors',
-                            'px-2 py-2.5 text-base',
-                            isLocked
-                              ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                              : isSaving
-                                ? 'bg-amber-50 border-amber-300 text-slate-800 focus:border-amber-400 focus:ring-1 focus:ring-amber-100'
-                                : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200'
+                            'w-full rounded-lg border text-center outline-none transition-colors px-2 py-2.5 text-base',
+                            isLocked ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                              : isSaving ? 'bg-amber-50 border-amber-300 text-slate-800'
+                              : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200'
                           )}
                           onChange={e => handleDiemChange(row.thisinh_id, 'diem_gk2', e.target.value)}
                         />
@@ -551,8 +662,7 @@ export default function NhapDiemPage() {
                         <label className="block text-[10px] font-semibold text-slate-400 mb-1 uppercase">ĐTB</label>
                         <div className={cn(
                           'w-full rounded-lg border text-center font-bold px-2 py-2.5 text-base',
-                          dtb != null
-                            ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                          dtb != null ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
                             : 'bg-slate-100 border-slate-200 text-slate-400'
                         )}>
                           {dtb != null ? dtb.toFixed(2) : '—'}
@@ -560,19 +670,17 @@ export default function NhapDiemPage() {
                       </div>
                     </div>
 
-                    {/* Điểm ưu tiên + Vắng/Bỏ row */}
                     <div className="flex items-center gap-3">
                       <label className="text-sm text-slate-500">Điểm ưu tiên:</label>
                       <input
                         type="text"
                         inputMode="decimal"
                         disabled={isLocked}
-                        defaultValue={row.diem_uu_tien != null ? String(row.diem_uu_tien) : isDTTS(row.dan_toc) ? '5' : ''}
+                        value={row.diem_uu_tien != null ? String(row.diem_uu_tien) : ''}
                         placeholder="—"
                         className={cn(
                           'w-16 rounded-lg border text-center text-sm outline-none transition-colors px-2 py-1.5',
-                          isLocked
-                            ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                          isLocked ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
                             : 'bg-amber-50 border-amber-200 text-amber-800 focus:border-amber-400 focus:ring-1 focus:ring-amber-100'
                         )}
                         onBlur={e => {
@@ -584,18 +692,19 @@ export default function NhapDiemPage() {
                         }}
                       />
                       <div className="ml-auto flex items-center gap-3">
-                        <label className={cn(
-                          'flex items-center gap-1.5 cursor-pointer text-sm select-none',
-                          isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:text-orange-600'
-                        )}>
-                          <input
-                            type="checkbox"
-                            disabled={isLocked}
-                            checked={!!row.vang_thi}
+                        <label className={cn('flex items-center gap-1.5 cursor-pointer text-sm select-none',
+                          isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:text-orange-600')}>
+                          <input type="checkbox" disabled={isLocked} checked={!!row.vang_thi}
                             onChange={e => handleVangBoChange(row.thisinh_id, 'vang_thi', e.target.checked)}
-                            className="h-4 w-4 rounded border-slate-300 accent-orange-500"
-                          />
+                            className="h-4 w-4 rounded border-slate-300 accent-orange-500" />
                           <span className="text-slate-500">Vắng</span>
+                        </label>
+                        <label className={cn('flex items-center gap-1.5 cursor-pointer text-sm select-none',
+                          isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:text-red-600')}>
+                          <input type="checkbox" disabled={isLocked} checked={!!row.bo_thi}
+                            onChange={e => handleVangBoChange(row.thisinh_id, 'bo_thi', e.target.checked)}
+                            className="h-4 w-4 rounded border-slate-300 accent-red-500" />
+                          <span className="text-slate-500">Bỏ</span>
                         </label>
                       </div>
                     </div>
@@ -606,224 +715,286 @@ export default function NhapDiemPage() {
 
             {/* ── Desktop Grid ── */}
             <div className="hidden lg:block overflow-x-auto">
-            {/* Table header */}
-            <div className="grid bg-[#1d293d]" style={{ gridTemplateColumns: '110px 1fr 90px 90px 90px 90px 110px 120px' }}>
-              <div className="px-4 py-3">
-                <span className="text-xs font-semibold tracking-wide text-slate-300 uppercase">SBD</span>
+              <div className="grid bg-[#1d293d]" style={{ gridTemplateColumns: '110px 1fr 90px 90px 90px 90px 140px 130px' }}>
+                <div className="px-4 py-3"><span className="text-xs font-semibold tracking-wide text-slate-300 uppercase">SBD</span></div>
+                <div className="px-4 py-3">
+                  <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Họ và Tên</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">Theo danh sách phòng thi</div>
+                </div>
+                <div className="px-4 py-3">
+                  <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Điểm GK 1</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">Giám khảo 1</div>
+                </div>
+                <div className="px-4 py-3">
+                  <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Điểm GK 2</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">Giám khảo 2</div>
+                </div>
+                <div className="px-4 py-3">
+                  <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Điểm TB</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">Tự động tính</div>
+                </div>
+                <div className="px-4 py-3">
+                  <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Điểm ưu tiên</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">Điểm cộng</div>
+                </div>
+                <div className="px-3 py-3">
+                  <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Vắng / Bỏ</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">Đánh dấu</div>
+                </div>
+                <div className="px-4 py-3"><span className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Kết quả</span></div>
               </div>
-              <div className="px-4 py-3">
-                <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Họ và Tên</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Theo danh sách phòng thi</div>
-              </div>
-              <div className="px-4 py-3">
-                <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Điểm GK 1</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Giám khảo 1</div>
-              </div>
-              <div className="px-4 py-3">
-                <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Điểm GK 2</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Giám khảo 2</div>
-              </div>
-              <div className="px-4 py-3">
-                <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Điểm TB</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Tự động tính</div>
-              </div>
-              <div className="px-4 py-3">
-                <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Điểm ưu tiên</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Điểm cộng</div>
-              </div>
-              <div className="px-3 py-3">
-                <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Vắng / Bỏ</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Đánh dấu</div>
-              </div>
-              <div className="px-4 py-3">
-                <span className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Kết quả</span>
-              </div>
-            </div>
 
-            {/* Table rows */}
-            {rows.map((row, idx) => {
-              const isHighlighted = highlightId === row.thisinh_id;
-              const isLocked = row.trang_thai_nhap === 'DaKhoa' || !canNhap;
-              const isSaving = savingIds.has(row.thisinh_id);
-              const isSaved = savedIds.has(row.thisinh_id);
-              const dtb = calcDTB(row.diem_gk1, row.diem_gk2);
-              const badge = isSaving
-                ? { label: 'Đang lưu...', cls: 'bg-amber-50 text-amber-600 border-amber-200' }
-                : isSaved
-                ? { label: 'Đã lưu ✓', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
-                : statusBadge(row);
+              {rows.map((row, idx) => {
+                const isHighlighted = highlightId === row.thisinh_id;
+                const isLocked = row.trang_thai_nhap === 'DaKhoa' || !canNhap;
+                const isSaving = savingIds.has(row.thisinh_id);
+                const isSaved = savedIds.has(row.thisinh_id);
+                const dtb = calcDTB(row.diem_gk1, row.diem_gk2);
+                const badge = isSaving
+                  ? { label: 'Đang lưu...', cls: 'bg-amber-50 text-amber-600 border-amber-200' }
+                  : isSaved
+                    ? { label: 'Đã lưu ✓', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+                    : statusBadge(row);
 
-              return (
-                <div
-                  key={row.id}
-                  id={`row-${row.thisinh_id}`}
-                  className={cn(
-                    'grid border-b border-slate-100 transition-colors duration-300',
-                    idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60',
-                    isHighlighted && 'bg-blue-50 ring-2 ring-inset ring-blue-400',
-                    isSaved && !isHighlighted && 'bg-emerald-50/40',
-                    (row.vang_thi || row.bo_thi) && !isHighlighted && !isSaved && 'bg-orange-50/40',
-                  )}
-                  style={{ gridTemplateColumns: '110px 1fr 90px 90px 90px 90px 110px 120px' }}
-                >
-                  {/* SBD */}
-                  <div className="px-4 py-3 flex items-center">
-                    <span className="inline-flex items-center rounded px-2 py-0.5 bg-[#1d293d] text-slate-200 text-xs font-bold font-mono">
-                      {row.sbd ?? row.thisinh_id}
-                    </span>
-                  </div>
-
-                  {/* Tên ẩn danh */}
-                  <div className="px-4 py-3 flex items-center">
-                    <span className="text-sm text-slate-600">{row.ho_ten}</span>
-                  </div>
-
-                  {/* GK1 */}
-                  <div className="px-3 py-2.5 flex items-center">
-                    <input
-                      type="number"
-                      min={0} max={100} step={0.5}
-                      disabled={isLocked}
-                      value={row.diem_gk1 ?? ''}
-                      placeholder="0–100"
-                      className={cn(
-                        'w-full rounded-lg border text-center text-sm outline-none transition-colors',
-                        'px-2 py-1.5',
-                        isLocked
-                          ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                          : isSaving
-                          ? 'bg-amber-50 border-amber-300 text-slate-800'
-                          : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200'
+                return (
+                  <div
+                    key={row.id}
+                    id={`row-${row.thisinh_id}`}
+                    className={cn(
+                      'grid border-b border-slate-100 transition-colors duration-300',
+                      idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60',
+                      isHighlighted && 'bg-blue-50 ring-2 ring-inset ring-blue-400',
+                      isSaved && !isHighlighted && 'bg-emerald-50/40',
+                      (row.vang_thi || row.bo_thi) && !isHighlighted && !isSaved && 'bg-orange-50/40',
+                    )}
+                    style={{ gridTemplateColumns: '110px 1fr 90px 90px 90px 90px 140px 130px' }}
+                  >
+                    <div className="px-4 py-3 flex items-center">
+                      <span className="inline-flex items-center rounded px-2 py-0.5 bg-[#1d293d] text-slate-200 text-xs font-bold font-mono">
+                        {row.sbd ?? row.thisinh_id}
+                      </span>
+                    </div>
+                    <div className="px-4 py-3 flex items-center">
+                      <span className="text-sm text-slate-600">{row.ho_ten}</span>
+                    </div>
+                    <div className="px-3 py-2.5 flex items-center">
+                      <input type="number" min={0} max={100} step={0.5} disabled={isLocked}
+                        value={row.diem_gk1 ?? ''} placeholder="0–100"
+                        className={cn('w-full rounded-lg border text-center text-sm outline-none transition-colors px-2 py-1.5',
+                          isLocked ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                            : isSaving ? 'bg-amber-50 border-amber-300 text-slate-800'
+                            : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200')}
+                        onChange={e => handleDiemChange(row.thisinh_id, 'diem_gk1', e.target.value)}
+                      />
+                    </div>
+                    <div className="px-3 py-2.5 flex items-center">
+                      <input type="number" min={0} max={100} step={0.5} disabled={isLocked}
+                        value={row.diem_gk2 ?? ''} placeholder="0–100"
+                        className={cn('w-full rounded-lg border text-center text-sm outline-none transition-colors px-2 py-1.5',
+                          isLocked ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                            : isSaving ? 'bg-amber-50 border-amber-300 text-slate-800'
+                            : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200')}
+                        onChange={e => handleDiemChange(row.thisinh_id, 'diem_gk2', e.target.value)}
+                      />
+                    </div>
+                    <div className="px-3 py-2.5 flex items-center">
+                      <div className={cn('w-full rounded-lg border text-center text-sm font-bold px-2 py-1.5',
+                        dtb != null ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                          : 'bg-slate-100 border-slate-200 text-slate-400')}>
+                        {dtb != null ? dtb.toFixed(2) : '—'}
+                      </div>
+                    </div>
+                    <div className="px-3 py-2.5 flex items-center">
+                      <input type="text" inputMode="decimal" disabled={isLocked}
+                        value={row.diem_uu_tien != null ? String(row.diem_uu_tien) : ''}
+                        placeholder="—"
+                        className={cn('w-full rounded-lg border text-center text-sm outline-none transition-colors px-2 py-1.5',
+                          isLocked ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                            : 'bg-amber-50 border-amber-200 text-amber-800 focus:border-amber-400 focus:ring-1 focus:ring-amber-100')}
+                        onBlur={e => {
+                          const raw = e.target.value.trim();
+                          if (raw === '' || raw === String(row.diem_uu_tien ?? '')) return;
+                          const num = parseFloat(raw);
+                          if (!isNaN(num) && num >= 0) handleUuTienChange(row.thisinh_id, raw);
+                          else e.target.value = row.diem_uu_tien != null ? String(row.diem_uu_tien) : '';
+                        }}
+                      />
+                    </div>
+                    <div className="px-3 py-2.5 flex items-center gap-3">
+                      <label className={cn('flex items-center gap-1 cursor-pointer text-xs select-none',
+                        isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:text-orange-600')}>
+                        <input type="checkbox" disabled={isLocked} checked={!!row.vang_thi}
+                          onChange={e => handleVangBoChange(row.thisinh_id, 'vang_thi', e.target.checked)}
+                          className="rounded border-slate-300 accent-orange-500" />
+                        <span className="text-slate-500">Vắng</span>
+                      </label>
+                      <label className={cn('flex items-center gap-1 cursor-pointer text-xs select-none',
+                        isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:text-red-600')}>
+                        <input type="checkbox" disabled={isLocked} checked={!!row.bo_thi}
+                          onChange={e => handleVangBoChange(row.thisinh_id, 'bo_thi', e.target.checked)}
+                          className="rounded border-slate-300 accent-red-500" />
+                        <span className="text-slate-500">Bỏ</span>
+                      </label>
+                    </div>
+                    <div className="px-4 py-3 flex items-center">
+                      {isSaving ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs bg-amber-50 text-amber-600 border-amber-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                          Đang lưu
+                        </span>
+                      ) : (
+                        <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
+                          isSaved && badge.label === 'Đã nhập'
+                            ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                            : badge.cls)}>
+                          {badge.label}
+                        </span>
                       )}
-                      onChange={e => handleDiemChange(row.thisinh_id, 'diem_gk1', e.target.value)}
-                    />
-                  </div>
-
-                  {/* GK2 */}
-                  <div className="px-3 py-2.5 flex items-center">
-                    <input
-                      type="number"
-                      min={0} max={100} step={0.5}
-                      disabled={isLocked}
-                      value={row.diem_gk2 ?? ''}
-                      placeholder="0–100"
-                      className={cn(
-                        'w-full rounded-lg border text-center text-sm outline-none transition-colors',
-                        'px-2 py-1.5',
-                        isLocked
-                          ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                          : isSaving
-                          ? 'bg-amber-50 border-amber-300 text-slate-800'
-                          : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200'
-                      )}
-                      onChange={e => handleDiemChange(row.thisinh_id, 'diem_gk2', e.target.value)}
-                    />
-                  </div>
-
-                  {/* DTB — readonly, auto */}
-                  <div className="px-3 py-2.5 flex items-center">
-                    <div className={cn(
-                      'w-full rounded-lg border text-center text-sm font-bold px-2 py-1.5',
-                      dtb != null
-                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                        : 'bg-slate-100 border-slate-200 text-slate-400'
-                    )}>
-                      {dtb != null ? dtb.toFixed(2) : '—'}
                     </div>
                   </div>
+                );
+              })}
 
-                  {/* Điểm ưu tiên */}
-                  <div className="px-3 py-2.5 flex items-center">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      disabled={isLocked}
-                      defaultValue={row.diem_uu_tien != null ? String(row.diem_uu_tien) : (isDTTS(row.dan_toc) ? '5' : '')}
-                      placeholder="—"
-                      className={cn(
-                        'w-full rounded-lg border text-center text-sm outline-none transition-colors px-2 py-1.5',
-                        isLocked
-                          ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                          : 'bg-amber-50 border-amber-200 text-amber-800 focus:border-amber-400 focus:ring-1 focus:ring-amber-100'
-                      )}
-                      onBlur={e => {
-                        const raw = e.target.value.trim();
-                        if (raw === '' || raw === String(row.diem_uu_tien ?? '')) return;
-                        const num = parseFloat(raw);
-                        if (!isNaN(num) && num >= 0) handleUuTienChange(row.thisinh_id, raw);
-                        else e.target.value = row.diem_uu_tien != null ? String(row.diem_uu_tien) : '';
-                      }}
-                    />
-                  </div>
-
-                  {/* Vắng / Bỏ thi */}
-                  <div className="px-3 py-2.5 flex items-center gap-2">
-                    <label className={cn(
-                      'flex items-center gap-1 cursor-pointer text-xs select-none',
-                      isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:text-orange-600'
-                    )}>
-                      <input
-                        type="checkbox"
-                        disabled={isLocked}
-                        checked={!!row.vang_thi}
-                        onChange={e => handleVangBoChange(row.thisinh_id, 'vang_thi', e.target.checked)}
-                        className="rounded border-slate-300 accent-orange-500"
-                      />
-                      <span className="text-slate-500">Vắng</span>
-                    </label>
-                  </div>
-
-                  {/* Status badge */}
-                  <div className="px-4 py-3 flex items-center">
-                    {isSaving ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs bg-amber-50 text-amber-600 border-amber-200">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                        Đang lưu
-                      </span>
-                    ) : (
-                      <span className={cn(
-                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
-                        isSaved && badge.label === 'Đã nhập'
-                          ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
-                          : badge.cls
-                      )}>
-                        {badge.label}
-                      </span>
-                    )}
-                  </div>
+              <div className="flex items-center justify-between bg-slate-50 border-t border-slate-200 px-4 py-2.5">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <span>Tổng: <b className="text-slate-700">{stats.tongThiSinh}</b> thí sinh</span>
+                  <span className="text-slate-300">|</span>
+                  <span>Đã nhập đủ: <b className="text-emerald-600">{stats.daNhap + stats.daKhoa}</b></span>
+                  <span className="text-slate-300">|</span>
+                  <span>Chưa nhập: <b className="text-amber-600">{stats.chuaNhap}</b></span>
+                  {stats.daKhoa > 0 && (
+                    <>
+                      <span className="text-slate-300">|</span>
+                      <span>Đã khóa: <b className="text-slate-600">{stats.daKhoa}</b></span>
+                    </>
+                  )}
                 </div>
-              );
-            })}
-
-            {/* Footer stats row */}
-            <div className="flex items-center justify-between bg-slate-50 border-t border-slate-200 px-4 py-2.5">
-              <div className="flex items-center gap-2 text-xs text-slate-500">
-                <span>Tổng: <b className="text-slate-700">{stats.tongThiSinh}</b> thí sinh</span>
-                <span className="text-slate-300">|</span>
-                <span>Đã nhập đủ: <b className="text-emerald-600">{stats.daNhap + stats.daKhoa}</b></span>
-                <span className="text-slate-300">|</span>
-                <span>Chưa nhập: <b className="text-amber-600">{stats.chuaNhap}</b></span>
-                {stats.daKhoa > 0 && (
-                  <>
-                    <span className="text-slate-300">|</span>
-                    <span>Đã khóa: <b className="text-slate-600">{stats.daKhoa}</b></span>
-                  </>
-                )}
+                <span className="text-xs text-slate-400">Tab / Enter → chuyển ô nhanh</span>
               </div>
-              <span className="text-xs text-slate-400">Tab / Enter → chuyển ô nhanh</span>
-            </div>
             </div>
           </>
         )}
       </div>
 
-      {/* ── Phòng info ──────────────────────────────────────────────────── */}
       {selectedPhong && (
         <p className="text-xs text-slate-400">
           Phòng: <span className="font-medium text-slate-600">{selectedPhong.ma_phong}</span>
           {selectedPhong.ten_phong && ` — ${selectedPhong.ten_phong}`}
         </p>
       )}
+
+      {/* ── Modal tổng hợp hoàn tất ────────────────────────────────────────── */}
+      <Modal
+        open={completionOpen}
+        onClose={() => setCompletionOpen(false)}
+        title="Tổng hợp hoàn tất nhập điểm"
+        size="xl"
+      >
+        {!completion ? (
+          <div className="flex items-center justify-center py-10"><Spinner /></div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+              <div className="rounded-lg border border-slate-200 p-3">
+                <div className="text-xs text-slate-500">Tổng TS</div>
+                <div className="text-xl font-bold">{completion.overall.tongThiSinh}</div>
+              </div>
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                <div className="text-xs text-emerald-700">Đã nhập</div>
+                <div className="text-xl font-bold text-emerald-700">{completion.overall.daNhap}</div>
+              </div>
+              <div className="rounded-lg border border-slate-300 bg-slate-50 p-3">
+                <div className="text-xs text-slate-600">Đã khóa</div>
+                <div className="text-xl font-bold text-slate-700">{completion.overall.daKhoa}</div>
+              </div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <div className="text-xs text-amber-700">Chưa nhập</div>
+                <div className="text-xl font-bold text-amber-700">{completion.overall.chuaNhap}</div>
+              </div>
+              <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+                <div className="text-xs text-orange-700">Vắng thi</div>
+                <div className="text-xl font-bold text-orange-700">{completion.overall.vang}</div>
+              </div>
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                <div className="text-xs text-red-700">Bỏ thi</div>
+                <div className="text-xl font-bold text-red-700">{completion.overall.bo}</div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-slate-200">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Phòng</th>
+                    <th className="px-3 py-2 text-right">Tổng</th>
+                    <th className="px-3 py-2 text-right">Đã nhập</th>
+                    <th className="px-3 py-2 text-right">Đã khóa</th>
+                    <th className="px-3 py-2 text-right">Chưa nhập</th>
+                    <th className="px-3 py-2 text-right">Vắng</th>
+                    <th className="px-3 py-2 text-right">Bỏ</th>
+                    <th className="px-3 py-2 text-center">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {completion.phongs.length === 0 && (
+                    <tr><td colSpan={8} className="px-3 py-6 text-center text-slate-400">Chưa có phòng thi nào trong kỳ</td></tr>
+                  )}
+                  {completion.phongs.map(p => {
+                    const done = p.tong > 0 && p.tong === p.daKhoa;
+                    return (
+                      <tr key={p.phongthi_id} className="border-t border-slate-100">
+                        <td className="px-3 py-2 font-medium text-slate-700">
+                          {p.ma_phong}{p.ten_phong ? ` — ${p.ten_phong}` : ''}
+                        </td>
+                        <td className="px-3 py-2 text-right">{p.tong}</td>
+                        <td className="px-3 py-2 text-right text-emerald-700">{p.daNhap}</td>
+                        <td className="px-3 py-2 text-right text-slate-700">{p.daKhoa}</td>
+                        <td className={cn('px-3 py-2 text-right', p.chuaNhap > 0 ? 'text-amber-700 font-semibold' : 'text-slate-400')}>
+                          {p.chuaNhap}
+                        </td>
+                        <td className="px-3 py-2 text-right text-orange-700">{p.vang}</td>
+                        <td className="px-3 py-2 text-right text-red-700">{p.bo}</td>
+                        <td className="px-3 py-2 text-center">
+                          {done ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-700">
+                              <CheckCircle2 size={14} /> Hoàn tất
+                            </span>
+                          ) : p.tong === 0 ? (
+                            <span className="text-slate-400">—</span>
+                          ) : (
+                            <span className="text-amber-700">Còn {p.chuaNhap} chưa nhập</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-slate-200 pt-3">
+              <div className="text-sm">
+                {allRoomsReady ? (
+                  <span className="text-emerald-700 font-medium">
+                    Tất cả phòng đã hoàn tất — có thể chạy xét duyệt kết quả.
+                  </span>
+                ) : (
+                  <span className="text-amber-700">
+                    Còn phòng chưa hoàn tất — vui lòng khóa điểm hết các phòng trước khi xét duyệt.
+                  </span>
+                )}
+              </div>
+              <Button
+                variant="primary"
+                disabled={!allRoomsReady}
+                onClick={handleXetDuyet}
+              >
+                Xét duyệt kết quả
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

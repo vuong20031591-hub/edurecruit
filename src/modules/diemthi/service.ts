@@ -3,10 +3,19 @@
  * File: src/modules/diemthi/service.ts
  */
 import { diemthiRepository } from './repository';
+import { computeDiemUuTien } from './uu-tien';
 import { ValidationError, NotFoundError, ConflictError } from '@/server/api';
 import type { Session } from '@/server/auth';
 import { audit } from '@/server/audit';
-import type { DiemThiFilter, DiemThiStats, DiemThiUpsert, DiemThiView, KhoaDiemPayload, KhoaDiemResult } from './types';
+import type {
+  DiemThiCompletionSummary,
+  DiemThiFilter,
+  DiemThiStats,
+  DiemThiUpsert,
+  DiemThiView,
+  KhoaDiemPayload,
+  KhoaDiemResult
+} from './types';
 
 function actorId(session: Session): number { return parseInt(session.sub, 10); }
 
@@ -77,5 +86,58 @@ export const diemthiService = {
       result: 'SUCCESS',
     });
     return result;
+  },
+
+  /**
+   * Tự động điền điểm ưu tiên từ trường doi_tuong_uu_tien của hồ sơ đăng ký
+   * cho các thí sinh trong một phòng chưa có điểm ưu tiên.
+   * Idempotent: chỉ chạm các bản ghi chưa có.
+   */
+  async prefillUuTienForPhong(
+    phongthi_id: number,
+    session: Session
+  ): Promise<{ updated: number; skipped: number }> {
+    if (!phongthi_id) throw new ValidationError('Thiếu phongthi_id');
+    if (!diemthiRepository.phongthi_exists(phongthi_id)) {
+      throw new NotFoundError(`Phòng thi #${phongthi_id} không tồn tại`);
+    }
+    const rows = diemthiRepository.listMissingUuTien(phongthi_id);
+    const userId = actorId(session);
+    let updated = 0;
+    let skipped = 0;
+
+    for (const row of rows) {
+      const diem = computeDiemUuTien(row.doi_tuong_uu_tien);
+      if (diem <= 0) {
+        skipped++;
+        continue;
+      }
+      diemthiRepository.upsertKetquaUuTien(row.thisinh_id, diem, userId);
+      updated++;
+    }
+
+    if (updated > 0) {
+      audit({
+        action: 'PREFILL_DIEM_UU_TIEN',
+        userId,
+        username: session.username,
+        resourceType: 'phongthi',
+        resourceId: phongthi_id,
+        payload: { updated, skipped },
+        result: 'SUCCESS',
+      });
+    }
+    return { updated, skipped };
+  },
+
+  /**
+   * Lấy tổng hợp trạng thái nhập điểm toàn kỳ: theo phòng và tổng số.
+   */
+  async getCompletionSummary(
+    ky_tuyendung_id: number,
+    _session: Session
+  ): Promise<DiemThiCompletionSummary> {
+    if (!ky_tuyendung_id) throw new ValidationError('Thiếu ky_tuyendung_id');
+    return diemthiRepository.getCompletionSummaryByKy(ky_tuyendung_id);
   },
 };
