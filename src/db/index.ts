@@ -98,14 +98,20 @@ export function dbInfo(): {
   encrypted: boolean;
   wal: boolean;
   vitri_columns: string[];
+  migrations: string[];
 } {
   const db = getDb();
   const wal = db.pragma('journal_mode', { simple: true });
   const cols = db.prepare("PRAGMA table_info(vitri_tuyendung)").all() as { name: string }[];
+  let migrations: string[] = [];
+  try {
+    migrations = (db.prepare("SELECT name FROM migrations ORDER BY name").all() as { name: string }[]).map(r => r.name);
+  } catch { /* migrations table may not exist */ }
   return {
     path: resolveDbPath(),
     encrypted: !!process.env.DB_KEY,
     wal: wal === 'wal',
-    vitri_columns: cols.map(c => c.name)
+    vitri_columns: cols.map(c => c.name),
+    migrations
   };
 }
