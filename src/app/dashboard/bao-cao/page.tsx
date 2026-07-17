@@ -21,6 +21,7 @@ interface BaoCaoData {
   phanBoDiem: PhanBoBin[];
   tyLe: TyLeData;
   ketQuaTheoViTri: KetQuaViTri[];
+  diemDat: number;
 }
 
 const EMPTY: BaoCaoData = {
@@ -29,6 +30,7 @@ const EMPTY: BaoCaoData = {
   phanBoDiem: [],
   tyLe: { dat: 0, khongDat: 0, tyLeDat: 0, tyLeRat: 0, tong: 0, vangBo: 0 },
   ketQuaTheoViTri: [],
+  diemDat: 50,
 };
 
 // ─── Export file definitions ──────────────────────────────────────────────────
@@ -63,6 +65,12 @@ const EXPORT_FILES = [
     name: 'Bảng điểm chi tiết theo phòng thi',
     type: 'Excel' as const,
     badgeCls: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  },
+  {
+    id: 'qd-tuyen-dung',
+    name: 'Quyết định tuyển dụng (danh sách trúng tuyển)',
+    type: 'Word' as const,
+    badgeCls: 'bg-blue-50 text-blue-700 border-blue-200',
   },
 ];
 
@@ -112,8 +120,8 @@ export default function BaoCaoPage() {
 
   // Pie chart data
   const pieData = data.tyLe.tong > 0 ? [
-    { name: `Đỗ (≥5.0)`, value: data.tyLe.dat, fill: '#10b981' },
-    { name: `Trượt (<5.0)`, value: data.tyLe.khongDat, fill: '#ef4444' },
+    { name: `Đỗ (≥${data.diemDat})`, value: data.tyLe.dat, fill: '#10b981' },
+    { name: `Trượt (<${data.diemDat})`, value: data.tyLe.khongDat, fill: '#ef4444' },
     ...(data.tyLe.vangBo > 0 ? [{ name: 'Vắng/Bỏ', value: data.tyLe.vangBo, fill: '#94a3b8' }] : []),
   ] : [];
 
@@ -121,25 +129,25 @@ export default function BaoCaoPage() {
   async function handleExport(fileId: string) {
     if (!kyId) return;
     // Chỉ 3 loại Excel có API, 2 loại còn lại (PDF/Word) để sau
-    const excelMap: Record<string, string> = {
-      'ds-du-thi': 'ds-du-thi',
-      'ket-qua-diem': 'ket-qua-diem',
-      'bang-diem-phong': 'bang-diem-phong',
-    };
-    const loai = excelMap[fileId];
-    if (!loai) {
-      // PDF/Word — chưa implement, thông báo
+    const wordLoais = ['qd-tuyen-dung'];
+    const stubLoais = ['ds-dau', 'bien-ban'];
+    if (stubLoais.includes(fileId)) {
       alert('Xuất PDF/Word sẽ khả dụng khi có template Word chuẩn từ Hội đồng.');
       return;
     }
+    const isWord = wordLoais.includes(fileId);
     try {
-      const res = await fetch(`/api/bao-cao/xuat?ky_tuyendung_id=${kyId}&loai=${loai}`);
-      if (!res.ok) { alert('Lỗi xuất file'); return; }
+      const res = await fetch(`/api/bao-cao/xuat?ky_tuyendung_id=${kyId}&loai=${fileId}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert((err as { error?: string }).error ?? 'Lỗi xuất file');
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `bao-cao-${loai}.xlsx`;
+      a.download = isWord ? `${fileId}-${Date.now()}.docx` : `bao-cao-${fileId}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {

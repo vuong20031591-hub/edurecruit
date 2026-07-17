@@ -14,6 +14,9 @@ export async function GET(req: NextRequest) {
     const db = getDb();
     const id = Number(kyId);
 
+    const diemDatRow = db.prepare("SELECT value FROM system_config WHERE key = 'xet_tuyen.diem_dat'").get() as { value: string } | undefined;
+    const diemDat = diemDatRow ? parseFloat(diemDatRow.value) : 50;
+
     // ── 1. Phân bổ điểm thi (histogram bins) ──────────────────────────────
     // Chỉ lấy thí sinh có diem_thi_giang (đã thi)
     const diemRows = db.prepare(`
@@ -25,12 +28,12 @@ export async function GET(req: NextRequest) {
     `).all(id) as { diem_thi_giang: number }[];
 
     const bins = [
-      { label: '< 5.0', min: 0, max: 5, count: 0, color: '#ef4444' },
-      { label: '5.0–6.0', min: 5, max: 6, count: 0, color: '#f59e0b' },
-      { label: '6.0–7.0', min: 6, max: 7, count: 0, color: '#3b82f6' },
-      { label: '7.0–8.0', min: 7, max: 8, count: 0, color: '#6366f1' },
-      { label: '8.0–9.0', min: 8, max: 9, count: 0, color: '#10b981' },
-      { label: '≥ 9.0', min: 9, max: 11, count: 0, color: '#059669' },
+      { label: '< 50', min: 0, max: 50, count: 0, color: '#ef4444' },
+      { label: '50–60', min: 50, max: 60, count: 0, color: '#f59e0b' },
+      { label: '60–70', min: 60, max: 70, count: 0, color: '#3b82f6' },
+      { label: '70–80', min: 70, max: 80, count: 0, color: '#6366f1' },
+      { label: '80–90', min: 80, max: 90, count: 0, color: '#10b981' },
+      { label: '≥ 90', min: 90, max: 101, count: 0, color: '#059669' },
     ];
     for (const { diem_thi_giang: d } of diemRows) {
       const bin = bins.find(b => d >= b.min && d < b.max);
@@ -41,7 +44,7 @@ export async function GET(req: NextRequest) {
     // ── 2. Tỷ lệ đỗ/trượt ─────────────────────────────────────────────────
     let dat = 0, khongDat = 0;
     for (const { diem_thi_giang: d } of diemRows) {
-      if (d >= 5) dat++;
+      if (d >= diemDat) dat++;
       else khongDat++;
     }
     // Vắng/bỏ thi → cũng tính là không đạt (PRD §Bước5: tong_diem=0, loại khỏi xét tuyển)
@@ -61,8 +64,8 @@ export async function GET(req: NextRequest) {
       SELECT
         v.id AS vitri_id,
         v.mon AS ten_vi_tri,
-        SUM(CASE WHEN dt.diem_thi_giang >= 5 AND dt.vang_thi = 0 AND dt.bo_thi = 0 THEN 1 ELSE 0 END) AS dat,
-        SUM(CASE WHEN (dt.diem_thi_giang < 5 OR dt.vang_thi = 1 OR dt.bo_thi = 1) AND dt.diem_thi_giang IS NOT NULL THEN 1 ELSE 0 END) AS khong_dat,
+        SUM(CASE WHEN dt.diem_thi_giang >= ${diemDat} AND dt.vang_thi = 0 AND dt.bo_thi = 0 THEN 1 ELSE 0 END) AS dat,
+        SUM(CASE WHEN (dt.diem_thi_giang < ${diemDat} OR dt.vang_thi = 1 OR dt.bo_thi = 1) AND dt.diem_thi_giang IS NOT NULL THEN 1 ELSE 0 END) AS khong_dat,
         COUNT(*) AS tong
       FROM vitri_tuyendung v
       LEFT JOIN thisinh t ON t.vi_tri_dang_ky_id = v.id
@@ -94,6 +97,7 @@ export async function GET(req: NextRequest) {
       phanBoDiem,
       tyLe: { dat, khongDat, tyLeDat, tyLeRat, tong: tongCoKetQua },
       ketQuaTheoViTri,
+      diemDat,
     });
   } catch (err) {
     return handleApiError(err);

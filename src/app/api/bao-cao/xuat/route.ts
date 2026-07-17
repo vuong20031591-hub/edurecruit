@@ -3,6 +3,9 @@ import { handleApiError, requirePerm, json } from '@/server/api';
 import { getDb } from '@/db';
 import ExcelJS from 'exceljs';
 import { TrangThaiHoSoLabel, KetQuaLabel, type TrangThaiHoSoValue } from '@/shared/constants/enums';
+import { createReport } from 'docx-templates';
+import fs from 'fs';
+import path from 'path';
 
 /**
  * GET /api/bao-cao/xuat?ky_tuyendung_id=X&loai=ds-du-thi|ket-qua-diem|bang-diem-phong
@@ -467,12 +470,12 @@ export async function GET(req: NextRequest) {
       const diaDanh = addrParts[addrParts.length - 1].trim() || 'Lạng Sơn';
 
       const phongs = db.prepare(`
-        SELECT p.id, p.ma_phong, p.ten_phong, v.mon AS ten_vi_tri
+        SELECT p.id, p.ma_phong, p.ten_phong, v.mon AS ten_vi_tri, v.cap_hoc
         FROM phongthi p
         LEFT JOIN vitri_tuyendung v ON v.id = p.vi_tri_dang_ky_id
         WHERE p.ky_tuyendung_id = ?
         ORDER BY p.ngay_thi ASC, p.gio_thi ASC, p.ma_phong ASC
-      `).all(id) as { id: number; ma_phong: string; ten_phong: string | null; ten_vi_tri: string | null }[];
+      `).all(id) as { id: number; ma_phong: string; ten_phong: string | null; ten_vi_tri: string | null; cap_hoc: string | null }[];
 
       if (phongs.length === 0) {
         const ws = wb.addWorksheet('Trống');
@@ -494,8 +497,9 @@ export async function GET(req: NextRequest) {
         `).all(phong.id) as { sbd: string | null; ho: string; ten: string; ho_ten: string; ngay_sinh: string }[];
 
         const tenPhong = phong.ten_phong ?? phong.ma_phong;
-        const tieuDeDs = phong.ten_vi_tri
-          ? `DANH SÁCH GỌI THÍ SINH VÀO PHÒNG CHUẨN BỊ THI\n${phong.ten_vi_tri.toUpperCase()}`
+        const monCapHoc = [phong.ten_vi_tri, phong.cap_hoc].filter(Boolean).map(s => s!.toUpperCase()).join(' ');
+        const tieuDeDs = monCapHoc
+          ? `DANH SÁCH GỌI THÍ SINH VÀO PHÒNG CHUẨN BỊ THI\n${monCapHoc}`
           : 'DANH SÁCH GỌI THÍ SINH VÀO PHÒNG CHUẨN BỊ THI';
 
         // Mỗi phòng 1 sheet riêng
@@ -679,6 +683,77 @@ export async function GET(req: NextRequest) {
         // 4 dòng trống cho chữ ký tay
         curRow += 4;
       }
+
+    } else if (loai === 'qd-tuyen-dung') {
+      const templatePath = path.join(process.cwd(), 'public', 'templates', 'qd-tuyen-dung.docx');
+      const template = fs.readFileSync(templatePath);
+
+      const dsDat = db.prepare(`
+        SELECT t.ho_ten, t.ngay_sinh, t.trinh_do_chuyen_mon, t.chuyen_nganh,
+          v.mon, d.ten_don_vi
+        FROM ketqua kq
+        JOIN thisinh t ON t.id = kq.thisinh_id
+        LEFT JOIN vitri_tuyendung v ON v.id = t.vi_tri_dang_ky_id
+        LEFT JOIN don_vi_tuyen_dung d ON d.id = t.don_vi_du_tuyen_id
+        WHERE t.ky_tuyendung_id = ? AND kq.ket_qua = 'Dat'
+        ORDER BY v.mon ASC, t.ho_ten ASC
+      `).all(id) as { ho_ten: string; ngay_sinh: string | null; trinh_do_chuyen_mon: string | null; chuyen_nganh: string | null; mon: string | null; ten_don_vi: string | null }[];
+
+      if (dsDat.length === 0) {
+        return json({ error: 'Chưa có thí sinh trúng tuyển' }, { status: 404 });
+      }
+
+      // Render từng người, ghép lại thành 1 docx
+      const buffers: Uint8Array[] = [];
+      for (const ts of dsDat) {
+        const buf = await createReport({
+          template,
+          data: {
+            ho_ten: ts.ho_ten ?? '',
+            mon: ts.mon ?? '',
+            giam_doc: (db.prepare("SELECT value FROM system_config WHERE key = 'org.director'").get() as { value: string } | undefined)?.value ?? '',
+          },
+          cmdDelimiter: ['{', '}'],
+        });
+        buffers.push(buf);
+      }
+
+      // JOIN_DOCS: ghép nhiều docx thành 1 file (page break giữa mỗi QĐ)
+      const { default: JSZip } = await import('jszip');
+      if (buffers.length === 1) {
+        return new Response(Buffer.from(buffers[0]), {
+          headers: {
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Disposition': `attachment; filename="quyet-dinh-tuyen-dung-${Date.now()}.docx"`,
+          },
+        });
+      }
+
+      // Merge: lấy body XML từ mỗi buffer, ghép vào file đầu tiên với page break
+      const merged = await JSZip.loadAsync(buffers[0]);
+      let baseBodyXml = await merged.file('word/document.xml')!.async('string');
+
+      for (let i = 1; i < buffers.length; i++) {
+        const next = await JSZip.loadAsync(buffers[i]);
+        const nextXml = await next.file('word/document.xml')!.async('string');
+        // Lấy nội dung trong <w:body>...</w:body> (bỏ sectPr cuối)
+        const bodyMatch = nextXml.match(/<w:body>([\s\S]*?)<\/w:body>/);
+        if (!bodyMatch) continue;
+        const innerBody = bodyMatch[1].replace(/<w:sectPr[\s\S]*?<\/w:sectPr>/, '');
+        // Chèn page break + nội dung trước </w:body> của base
+        const pageBreak = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+        baseBodyXml = baseBodyXml.replace('</w:body>', pageBreak + innerBody + '</w:body>');
+      }
+
+      merged.file('word/document.xml', baseBodyXml);
+      const finalBuf = await merged.generateAsync({ type: 'arraybuffer' });
+
+      return new Response(finalBuf, {
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'Content-Disposition': `attachment; filename="quyet-dinh-tuyen-dung-${Date.now()}.docx"`,
+        },
+      });
 
     } else {
       return json({ error: 'loai không hợp lệ' }, { status: 400 });

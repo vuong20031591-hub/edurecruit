@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { cn } from '@/shared/lib/cn';
 import {
   LayoutDashboard, FileText, Calendar, ClipboardCheck,
-  BarChart3, Settings, GraduationCap, ChevronLeft, ChevronRight, Menu, X, Building2, Target
+  BarChart3, Settings, GraduationCap, ChevronLeft, ChevronRight, Menu, X, Building2, Target, Trophy
 } from 'lucide-react';
 import { useTopbar } from '@/shared/hooks/useTopbar';
 import type { Quyen } from '@/db/schema';
@@ -30,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/phong-thi', label: 'Xếp phòng thi',          icon: Calendar,        visibleFor: ['ADMIN', 'TO_NHAP_HOSO'] },
   // Nhập điểm: TO_NHAP_DIEM + ADMIN (diemthi.nhap); LANH_DAO chỉ khóa điểm nên vẫn cần xem
   { href: '/dashboard/nhap-diem', label: 'Nhập điểm & Xét duyệt',  icon: ClipboardCheck,  visibleFor: ['ADMIN', 'TO_NHAP_DIEM', 'LANH_DAO'] },
+  { href: '/dashboard/xet-tuyen', label: 'Xét tuyển',              icon: Trophy,          visibleFor: ['ADMIN', 'LANH_DAO'] },
   { href: '/dashboard/bao-cao',   label: 'Báo cáo',                icon: BarChart3 },
   // Cài đặt: chỉ ADMIN
   { href: '/dashboard/cai-dat',   label: 'Cài đặt',                icon: Settings,        visibleFor: ['ADMIN'] }

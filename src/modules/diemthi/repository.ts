@@ -100,15 +100,19 @@ export const diemthiRepository = {
     const existing = db.prepare('SELECT * FROM diemthi WHERE thisinh_id = ?').get(data.thisinh_id) as DiemThi | undefined;
 
     if (!existing) {
+      const gk1 = data.diem_gk1 ?? null;
+      const gk2 = data.diem_gk2 ?? null;
+      const diemTG = gk1 != null && gk2 != null ? Math.round((gk1 + gk2) / 2 * 100) / 100 : null;
       // INSERT
       const info = db.prepare(`
-        INSERT INTO diemthi (thisinh_id, phongthi_id, diem_gk1, diem_gk2, diem_dan_toc, vang_thi, bo_thi, ly_do_vang, trang_thai_nhap, ngay_nhap, nguoi_nhap)
-        VALUES (@thisinh_id, @phongthi_id, @diem_gk1, @diem_gk2, @diem_dan_toc, @vang_thi, @bo_thi, @ly_do_vang, @trang_thai_nhap, datetime('now'), @nguoi_nhap)
+        INSERT INTO diemthi (thisinh_id, phongthi_id, diem_gk1, diem_gk2, diem_thi_giang, diem_dan_toc, vang_thi, bo_thi, ly_do_vang, trang_thai_nhap, ngay_nhap, nguoi_nhap)
+        VALUES (@thisinh_id, @phongthi_id, @diem_gk1, @diem_gk2, @diem_thi_giang, @diem_dan_toc, @vang_thi, @bo_thi, @ly_do_vang, @trang_thai_nhap, datetime('now'), @nguoi_nhap)
       `).run({
         thisinh_id: data.thisinh_id,
         phongthi_id: data.phongthi_id ?? null,
-        diem_gk1: data.diem_gk1 ?? null,
-        diem_gk2: data.diem_gk2 ?? null,
+        diem_gk1: gk1,
+        diem_gk2: gk2,
+        diem_thi_giang: diemTG,
         diem_dan_toc: data.diem_dan_toc ?? null,
         vang_thi: data.vang_thi ? 1 : 0,
         bo_thi: data.bo_thi ? 1 : 0,
@@ -129,6 +133,12 @@ export const diemthiRepository = {
       if (data.phongthi_id !== undefined) { fields.push('phongthi_id = ?'); params.push(data.phongthi_id ?? null); }
       if (data.diem_gk1 !== undefined) { fields.push('diem_gk1 = ?'); params.push(data.diem_gk1 ?? null); }
       if (data.diem_gk2 !== undefined) { fields.push('diem_gk2 = ?'); params.push(data.diem_gk2 ?? null); }
+      if (data.diem_gk1 !== undefined || data.diem_gk2 !== undefined) {
+        const gk1 = data.diem_gk1 !== undefined ? data.diem_gk1 : existing.diem_gk1;
+        const gk2 = data.diem_gk2 !== undefined ? data.diem_gk2 : existing.diem_gk2;
+        const diemTG = gk1 != null && gk2 != null ? Math.round((gk1 + gk2) / 2 * 100) / 100 : null;
+        fields.push('diem_thi_giang = ?'); params.push(diemTG);
+      }
       if (data.diem_dan_toc !== undefined) { fields.push('diem_dan_toc = ?'); params.push(data.diem_dan_toc ?? null); }
       if (data.vang_thi !== undefined) {
         fields.push('vang_thi = ?'); params.push(data.vang_thi ? 1 : 0);
@@ -175,15 +185,18 @@ export const diemthiRepository = {
     const db = getDb();
     const tx = db.transaction(() => {
       const rows = db.prepare(
-        "SELECT id, trang_thai_nhap FROM diemthi WHERE phongthi_id = ? AND trang_thai_nhap != 'DaKhoa'"
-      ).all(phongthi_id) as { id: number; trang_thai_nhap: string }[];
+        "SELECT id, trang_thai_nhap, diem_gk1, diem_gk2 FROM diemthi WHERE phongthi_id = ? AND trang_thai_nhap != 'DaKhoa'"
+      ).all(phongthi_id) as { id: number; trang_thai_nhap: string; diem_gk1: number | null; diem_gk2: number | null }[];
 
       let locked = 0, skipped = 0;
       for (const row of rows) {
         if (row.trang_thai_nhap === 'ChuaNhap') { skipped++; continue; }
+        const dtg = (row.diem_gk1 != null && row.diem_gk2 != null)
+          ? Math.round((row.diem_gk1 + row.diem_gk2) / 2 * 100) / 100
+          : null;
         db.prepare(`
-          UPDATE diemthi SET trang_thai_nhap = 'DaKhoa', ngay_khoa = datetime('now'), nguoi_khoa = ? WHERE id = ?
-        `).run(userId, row.id);
+          UPDATE diemthi SET trang_thai_nhap = 'DaKhoa', diem_thi_giang = ?, ngay_khoa = datetime('now'), nguoi_khoa = ? WHERE id = ?
+        `).run(dtg, userId, row.id);
         locked++;
       }
       return { locked, skipped };

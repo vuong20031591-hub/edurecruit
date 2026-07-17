@@ -5,19 +5,11 @@ import { PageHeader, Button, Spinner, SelectDropdown, Modal, toast } from '@/sha
 import { useTopbar } from '@/shared/hooks/useTopbar';
 import { usePageFetch } from '@/shared/hooks/usePageFetch';
 import type { DiemThiView, DiemThiStats, DiemThiCompletionSummary } from '@/modules/diemthi/types';
-import { buildViTriLabel } from '@/shared/lib/format';
 import { cn } from '@/shared/lib/cn';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface PhongOption { id: number; ma_phong: string; ten_phong: string | null; }
-interface ViTriOption {
-  id: number;
-  mon: string;
-  cap_hoc: string;
-  loai_vi_tri?: string;
-  label: string;
-}
+interface PhongOption { id: number; ma_phong: string; ten_phong: string | null; ten_vi_tri?: string | null; }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -40,10 +32,6 @@ function statusBadge(row: DiemThiView) {
 export default function NhapDiemPage() {
   const { data: topbar } = useTopbar();
   const kyId = topbar.ky?.id ?? null;
-
-  // Vị trí (môn + cấp)
-  const [vitriList, setVitriList] = useState<ViTriOption[]>([]);
-  const [selectedVitriId, setSelectedVitriId] = useState<number | null>(null);
 
   // Phòng thi
   const [phongList, setPhongList] = useState<PhongOption[]>([]);
@@ -89,48 +77,31 @@ export default function NhapDiemPage() {
       .catch(() => {});
   }, []);
 
-  // ─── Load danh sách vị trí theo kỳ ────────────────────────────────────────
+  // ─── Load phòng list theo kỳ ──────────────────────────────────────────────
 
   useEffect(() => {
-    if (!kyId) return;
-    let alive = true;
-    fetch(`/api/vitri?all=true&ky_tuyendung_id=${kyId}`, { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : { data: [] })
-      .then(j => {
-        if (!alive) return;
-        const arr = Array.isArray(j) ? j : (j.data ?? []);
-        const list: ViTriOption[] = (arr as Array<{ id: number; mon: string; cap_hoc: string; loai_vi_tri?: string }>)
-          .map(v => ({ ...v, label: buildViTriLabel({ loai_vi_tri: v.loai_vi_tri ?? 'GiaoVien', mon: v.mon, cap_hoc: v.cap_hoc }) }));
-        setVitriList(list);
-      })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, [kyId]);
-
-  // ─── Load phòng list theo kỳ + vị trí ─────────────────────────────────────
-
-  useEffect(() => {
-    if (!kyId || !selectedVitriId) {
+    if (!kyId) {
       setPhongList([]);
       setSelectedPhongId(null);
       return;
     }
     let alive = true;
-    fetch(`/api/phongthi?ky_tuyendung_id=${kyId}&vi_tri_dang_ky_id=${selectedVitriId}`, { cache: 'no-store' })
+    fetch(`/api/phongthi?ky_tuyendung_id=${kyId}`, { cache: 'no-store' })
       .then(r => r.ok ? r.json() : { data: [] })
       .then(j => {
         if (!alive) return;
-        const list: PhongOption[] = (j.data ?? []).map((p: { id: number; ma_phong: string; ten_phong: string | null }) => ({
+        const list: PhongOption[] = (j.data ?? []).map((p: { id: number; ma_phong: string; ten_phong: string | null; ten_vi_tri?: string | null }) => ({
           id: p.id,
           ma_phong: p.ma_phong,
           ten_phong: p.ten_phong,
+          ten_vi_tri: p.ten_vi_tri,
         }));
         setPhongList(list);
         setSelectedPhongId(prev => (list.some(p => p.id === prev) ? prev : (list[0]?.id ?? null)));
       })
       .catch(() => {});
     return () => { alive = false; };
-  }, [kyId, selectedVitriId]);
+  }, [kyId]);
 
   // ─── Load điểm list + prefill ─────────────────────────────────────────────
 
@@ -219,17 +190,17 @@ export default function NhapDiemPage() {
       r.thisinh_id === thiSinhId ? { ...r, [field]: val } : r
     ));
 
-    setRows(prev => {
-      const row = prev.find(r => r.thisinh_id === thiSinhId);
-      if (row) {
-        const gk1 = field === 'diem_gk1' ? val : row.diem_gk1;
-        const gk2 = field === 'diem_gk2' ? val : row.diem_gk2;
+    // Chỉ cảnh báo khi vừa nhập val mới (không null) và cả 2 ô đã có giá trị
+    if (val !== null) {
+      const checkRow = rows.find(r => r.thisinh_id === thiSinhId);
+      if (checkRow) {
+        const gk1 = field === 'diem_gk1' ? val : checkRow.diem_gk1;
+        const gk2 = field === 'diem_gk2' ? val : checkRow.diem_gk2;
         if (gk1 != null && gk2 != null && Math.abs(gk1 - gk2) > 15) {
-          toast.error(`SBD ${row.sbd ?? row.thisinh_id}: Chênh lệch GK1-GK2 = ${Math.abs(gk1 - gk2).toFixed(1)} > 15`);
+          toast.error(`SBD ${checkRow.sbd ?? checkRow.thisinh_id}: Chênh lệch GK1-GK2 = ${Math.abs(gk1 - gk2).toFixed(1)} > 15`);
         }
       }
-      return prev;
-    });
+    }
 
     const key = `${thiSinhId}-${field}`;
     clearTimeout(saveTimers.current[key]);
@@ -459,19 +430,6 @@ export default function NhapDiemPage() {
 
       {/* ── Toolbar ──────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
-        {/* Vị trí (môn + cấp) */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-slate-600 whitespace-nowrap">Môn thi:</span>
-          <SelectDropdown
-            value={selectedVitriId ? String(selectedVitriId) : ''}
-            onChange={v => setSelectedVitriId(v ? Number(v) : null)}
-            options={vitriList.map(v => ({ value: String(v.id), label: v.label }))}
-            placeholder="Chọn môn..."
-            className="w-60"
-            aria-label="Môn thi"
-          />
-        </div>
-
         {/* Phòng thi */}
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-slate-600 whitespace-nowrap">Phòng thi:</span>
@@ -480,11 +438,11 @@ export default function NhapDiemPage() {
             onChange={v => setSelectedPhongId(v ? Number(v) : null)}
             options={phongList.map(p => ({
               value: String(p.id),
-              label: p.ten_phong ? `${p.ma_phong} — ${p.ten_phong}` : p.ma_phong,
+              label: [p.ma_phong, p.ten_vi_tri, p.ten_phong].filter(Boolean).join(' — '),
             }))}
-            placeholder={selectedVitriId ? 'Chọn phòng...' : 'Chọn môn trước'}
-            className="w-52"
-            disabled={!selectedVitriId || phongList.length === 0}
+            placeholder="Chọn phòng..."
+            className="w-72"
+            disabled={phongList.length === 0}
             aria-label="Phòng thi"
           />
         </div>
@@ -582,8 +540,6 @@ export default function NhapDiemPage() {
       <div data-guide="nhap-diem-grid" className="rounded-xl border border-slate-200 bg-white overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-16"><Spinner /></div>
-        ) : !selectedVitriId ? (
-          <div className="py-16 text-center text-slate-400 text-sm">Vui lòng chọn môn thi trước</div>
         ) : !selectedPhongId ? (
           <div className="py-16 text-center text-slate-400 text-sm">Vui lòng chọn phòng thi</div>
         ) : rows.length === 0 ? (
@@ -683,6 +639,7 @@ export default function NhapDiemPage() {
                           isLocked ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
                             : 'bg-amber-50 border-amber-200 text-amber-800 focus:border-amber-400 focus:ring-1 focus:ring-amber-100'
                         )}
+                        onChange={() => {}}
                         onBlur={e => {
                           const raw = e.target.value.trim();
                           if (raw === '' || raw === String(row.diem_uu_tien ?? '')) return;
@@ -808,6 +765,7 @@ export default function NhapDiemPage() {
                       <input type="text" inputMode="decimal" disabled={isLocked}
                         value={row.diem_uu_tien != null ? String(row.diem_uu_tien) : ''}
                         placeholder="—"
+                        onChange={() => {}}
                         className={cn('w-full rounded-lg border text-center text-sm outline-none transition-colors px-2 py-1.5',
                           isLocked ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
                             : 'bg-amber-50 border-amber-200 text-amber-800 focus:border-amber-400 focus:ring-1 focus:ring-amber-100')}
