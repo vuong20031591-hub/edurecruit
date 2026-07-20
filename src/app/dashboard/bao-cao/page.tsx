@@ -122,7 +122,7 @@ export default function BaoCaoPage() {
   const pieData = data.tyLe.tong > 0 ? [
     { name: `Đỗ (≥${data.diemDat})`, value: data.tyLe.dat, fill: '#10b981' },
     { name: `Trượt (<${data.diemDat})`, value: data.tyLe.khongDat, fill: '#ef4444' },
-    ...(data.tyLe.vangBo > 0 ? [{ name: 'Vắng/Bỏ', value: data.tyLe.vangBo, fill: '#94a3b8' }] : []),
+    ...(data.tyLe.vangBo > 0 ? [{ name: 'Vắng', value: data.tyLe.vangBo, fill: '#94a3b8' }] : []),
   ] : [];
 
   // Export handlers — gọi API /api/bao-cao/xuat

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest } from 'next/server';
 import { handleApiError, requirePerm, json } from '@/server/api';
 import { getAuditLog, countAuditLog } from '@/server/audit';

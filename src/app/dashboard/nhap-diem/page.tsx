@@ -648,20 +648,13 @@ export default function NhapDiemPage() {
                           else e.target.value = row.diem_uu_tien != null ? String(row.diem_uu_tien) : '';
                         }}
                       />
-                      <div className="ml-auto flex items-center gap-3">
+                      <div className="ml-auto flex items-center">
                         <label className={cn('flex items-center gap-1.5 cursor-pointer text-sm select-none',
                           isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:text-orange-600')}>
                           <input type="checkbox" disabled={isLocked} checked={!!row.vang_thi}
                             onChange={e => handleVangBoChange(row.thisinh_id, 'vang_thi', e.target.checked)}
                             className="h-4 w-4 rounded border-slate-300 accent-orange-500" />
                           <span className="text-slate-500">Vắng</span>
-                        </label>
-                        <label className={cn('flex items-center gap-1.5 cursor-pointer text-sm select-none',
-                          isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:text-red-600')}>
-                          <input type="checkbox" disabled={isLocked} checked={!!row.bo_thi}
-                            onChange={e => handleVangBoChange(row.thisinh_id, 'bo_thi', e.target.checked)}
-                            className="h-4 w-4 rounded border-slate-300 accent-red-500" />
-                          <span className="text-slate-500">Bỏ</span>
                         </label>
                       </div>
                     </div>
@@ -672,7 +665,7 @@ export default function NhapDiemPage() {
 
             {/* ── Desktop Grid ── */}
             <div className="hidden lg:block overflow-x-auto">
-              <div className="grid bg-[#1d293d]" style={{ gridTemplateColumns: '110px 1fr 90px 90px 90px 90px 140px 130px' }}>
+              <div className="grid bg-[#1d293d]" style={{ gridTemplateColumns: '110px 1fr 90px 90px 90px 90px 100px 130px' }}>
                 <div className="px-4 py-3"><span className="text-xs font-semibold tracking-wide text-slate-300 uppercase">SBD</span></div>
                 <div className="px-4 py-3">
                   <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Họ và Tên</div>
@@ -695,7 +688,7 @@ export default function NhapDiemPage() {
                   <div className="text-[10px] text-slate-500 mt-0.5">Điểm cộng</div>
                 </div>
                 <div className="px-3 py-3">
-                  <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Vắng / Bỏ</div>
+                  <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Vắng</div>
                   <div className="text-[10px] text-slate-500 mt-0.5">Đánh dấu</div>
                 </div>
                 <div className="px-4 py-3"><span className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Kết quả</span></div>
@@ -724,7 +717,7 @@ export default function NhapDiemPage() {
                       isSaved && !isHighlighted && 'bg-emerald-50/40',
                       (row.vang_thi || row.bo_thi) && !isHighlighted && !isSaved && 'bg-orange-50/40',
                     )}
-                    style={{ gridTemplateColumns: '110px 1fr 90px 90px 90px 90px 140px 130px' }}
+                    style={{ gridTemplateColumns: '110px 1fr 90px 90px 90px 90px 100px 130px' }}
                   >
                     <div className="px-4 py-3 flex items-center">
                       <span className="inline-flex items-center rounded px-2 py-0.5 bg-[#1d293d] text-slate-200 text-xs font-bold font-mono">
@@ -778,20 +771,13 @@ export default function NhapDiemPage() {
                         }}
                       />
                     </div>
-                    <div className="px-3 py-2.5 flex items-center gap-3">
+                    <div className="px-3 py-2.5 flex items-center">
                       <label className={cn('flex items-center gap-1 cursor-pointer text-xs select-none',
                         isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:text-orange-600')}>
                         <input type="checkbox" disabled={isLocked} checked={!!row.vang_thi}
                           onChange={e => handleVangBoChange(row.thisinh_id, 'vang_thi', e.target.checked)}
                           className="rounded border-slate-300 accent-orange-500" />
                         <span className="text-slate-500">Vắng</span>
-                      </label>
-                      <label className={cn('flex items-center gap-1 cursor-pointer text-xs select-none',
-                        isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:text-red-600')}>
-                        <input type="checkbox" disabled={isLocked} checked={!!row.bo_thi}
-                          onChange={e => handleVangBoChange(row.thisinh_id, 'bo_thi', e.target.checked)}
-                          className="rounded border-slate-300 accent-red-500" />
-                        <span className="text-slate-500">Bỏ</span>
                       </label>
                     </div>
                     <div className="px-4 py-3 flex items-center">

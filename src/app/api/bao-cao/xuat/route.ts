@@ -190,7 +190,6 @@ export async function GET(req: NextRequest) {
         { header: 'ĐTB', key: 'dtb', width: 8 },
         { header: 'Điểm ưu tiên', key: 'uu_tien', width: 14 },
         { header: 'Vắng', key: 'vang', width: 8 },
-        { header: 'Bỏ thi', key: 'bo', width: 8 },
         { header: 'Trạng thái', key: 'trang_thai', width: 14 },
       ];
       styleHeader(ws.getRow(1));
@@ -201,7 +200,7 @@ export async function GET(req: NextRequest) {
           dt.diem_gk1 AS gk1, dt.diem_gk2 AS gk2,
           dt.diem_thi_giang AS dtb,
           kq.diem_uu_tien AS uu_tien,
-          dt.vang_thi AS vang, dt.bo_thi AS bo,
+          (CASE WHEN dt.vang_thi = 1 OR dt.bo_thi = 1 THEN 1 ELSE 0 END) AS vang,
           dt.trang_thai_nhap AS trang_thai
         FROM thisinh t
         JOIN diemthi dt ON dt.thisinh_id = t.id
@@ -237,7 +236,6 @@ export async function GET(req: NextRequest) {
           { header: 'GK2', key: 'gk2', width: 8 },
           { header: 'ĐTB', key: 'dtb', width: 8 },
           { header: 'Vắng', key: 'vang', width: 8 },
-          { header: 'Bỏ thi', key: 'bo', width: 8 },
           { header: 'Trạng thái', key: 'trang_thai', width: 14 },
         ];
         styleHeader(ws.getRow(1));
@@ -246,7 +244,7 @@ export async function GET(req: NextRequest) {
           SELECT t.sbd, t.ho_ten,
             dt.diem_gk1 AS gk1, dt.diem_gk2 AS gk2,
             dt.diem_thi_giang AS dtb,
-            dt.vang_thi AS vang, dt.bo_thi AS bo,
+            (CASE WHEN dt.vang_thi = 1 OR dt.bo_thi = 1 THEN 1 ELSE 0 END) AS vang,
             dt.trang_thai_nhap AS trang_thai
           FROM thisinh t
           JOIN diemthi dt ON dt.thisinh_id = t.id

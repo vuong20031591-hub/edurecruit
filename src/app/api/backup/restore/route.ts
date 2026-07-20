@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest } from 'next/server';
 import { handleApiError, requirePerm, json, ValidationError, NotFoundError } from '@/server/api';
 import { closeDb } from '@/db';

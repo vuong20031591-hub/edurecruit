@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server';
 import { handleApiError, requirePerm, json } from '@/server/api';
 import { getDb } from '@/db';
 
+export const dynamic = 'force-dynamic';
+
 // GET /api/bao-cao?ky_tuyendung_id=X
 // Trả về toàn bộ dữ liệu cho trang Báo cáo
 export async function GET(req: NextRequest) {
@@ -95,7 +97,7 @@ export async function GET(req: NextRequest) {
       tongHopLe: tongHopLe.c,
       tongDaNhapDiem: tongDaNhapDiem.c,
       phanBoDiem,
-      tyLe: { dat, khongDat, tyLeDat, tyLeRat, tong: tongCoKetQua },
+      tyLe: { dat, khongDat, tyLeDat, tyLeRat, vangBo: vangBoRow.c, tong: tongCoKetQua },
       ketQuaTheoViTri,
       diemDat,
     });

@@ -12,7 +12,7 @@ export function BottomStatusBar() {
         <span className="text-slate-500">|</span>
         <span>Phiên bản: 0.1.0</span>
         <span className="text-slate-500">|</span>
-        <span>Cơ sở dữ liệu: Cục Nhân sự – Sở GD&amp;ĐT</span>
+        <span>Cơ sở dữ liệu: Phòng TCCB – Sở GDĐT Lạng Sơn</span>
       </div>
       <div className="text-slate-400">
         Ngày: {format(now, 'dd/MM/yyyy · HH:mm')}
