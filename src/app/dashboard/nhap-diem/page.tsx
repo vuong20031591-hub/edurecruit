@@ -190,18 +190,6 @@ export default function NhapDiemPage() {
       r.thisinh_id === thiSinhId ? { ...r, [field]: val } : r
     ));
 
-    // Chỉ cảnh báo khi vừa nhập val mới (không null) và cả 2 ô đã có giá trị
-    if (val !== null) {
-      const checkRow = rows.find(r => r.thisinh_id === thiSinhId);
-      if (checkRow) {
-        const gk1 = field === 'diem_gk1' ? val : checkRow.diem_gk1;
-        const gk2 = field === 'diem_gk2' ? val : checkRow.diem_gk2;
-        if (gk1 != null && gk2 != null && Math.abs(gk1 - gk2) > 15) {
-          toast.error(`SBD ${checkRow.sbd ?? checkRow.thisinh_id}: Chênh lệch GK1-GK2 = ${Math.abs(gk1 - gk2).toFixed(1)} > 15`);
-        }
-      }
-    }
-
     const key = `${thiSinhId}-${field}`;
     clearTimeout(saveTimers.current[key]);
     setSavingIds(prev => new Set(prev).add(thiSinhId));
@@ -233,6 +221,17 @@ export default function NhapDiemPage() {
         setSavingIds(prev => { const s = new Set(prev); s.delete(thiSinhId); return s; });
       }
     }, 800);
+  }
+
+  function handleValidateDiem(thiSinhId: number) {
+    const checkRow = rows.find(r => r.thisinh_id === thiSinhId);
+    if (checkRow) {
+      const gk1 = checkRow.diem_gk1;
+      const gk2 = checkRow.diem_gk2;
+      if (gk1 != null && gk2 != null && Math.abs(gk1 - gk2) > 15) {
+        toast.error(`SBD ${checkRow.sbd ?? checkRow.thisinh_id}: Chênh lệch GK1-GK2 = ${Math.abs(gk1 - gk2).toFixed(1)} > 15`);
+      }
+    }
   }
 
   // ─── Vắng/Bỏ thi toggle ───────────────────────────────────────────────────
@@ -303,6 +302,10 @@ export default function NhapDiemPage() {
 
   async function handleKhoaDiem() {
     if (!selectedPhongId) return;
+    if (savingIds.size > 0) {
+      toast.error('Vui lòng đợi hệ thống lưu xong điểm trước khi khóa');
+      return;
+    }
     setKhoaBusy(true);
     try {
       const res = await fetch('/api/diemthi/khoa', {
@@ -494,16 +497,20 @@ export default function NhapDiemPage() {
               size="sm"
               leftIcon={<Lock size={14} />}
               onClick={() => setKhoaConfirm(true)}
-              disabled={!selectedPhongId || isAllLocked || stats.tongThiSinh === 0}
+              disabled={!selectedPhongId || isAllLocked || stats.tongThiSinh === 0 || savingIds.size > 0}
             >
-              {isAllLocked ? 'Đã khóa' : 'Khóa điểm'}
+              {savingIds.size > 0 ? 'Đang lưu điểm...' : isAllLocked ? 'Đã khóa' : 'Khóa điểm'}
             </Button>
           </span>
         ) : (
           <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5">
             <AlertTriangle size={14} className="text-red-600" />
-            <span className="text-xs text-red-700 font-medium">Xác nhận khóa điểm?</span>
-            <Button variant="danger" size="sm" loading={khoaBusy} onClick={handleKhoaDiem}>Khóa</Button>
+            <span className="text-xs text-red-700 font-medium">
+              {savingIds.size > 0 ? 'Đang lưu điểm, vui lòng đợi...' : 'Xác nhận khóa điểm?'}
+            </span>
+            <Button variant="danger" size="sm" loading={khoaBusy} disabled={savingIds.size > 0} onClick={handleKhoaDiem}>
+              Khóa
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setKhoaConfirm(false)}>Hủy</Button>
           </div>
         ))}
@@ -552,9 +559,16 @@ export default function NhapDiemPage() {
                 const isHighlighted = highlightId === row.thisinh_id;
                 const isLocked = row.trang_thai_nhap === 'DaKhoa' || !canNhap;
                 const dtb = calcDTB(row.diem_gk1, row.diem_gk2);
-                const badge = statusBadge(row);
                 const isSaving = savingIds.has(row.thisinh_id);
                 const isSaved = savedIds.has(row.thisinh_id);
+                const isChenhLech = row.diem_gk1 != null && row.diem_gk2 != null && Math.abs(row.diem_gk1 - row.diem_gk2) > 15;
+                const badge = isSaving
+                  ? { label: 'Đang lưu...', cls: 'bg-amber-50 text-amber-600 border-amber-200' }
+                  : isSaved
+                    ? { label: 'Đã lưu ✓', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+                    : isChenhLech && row.trang_thai_nhap !== 'DaKhoa'
+                      ? { label: 'Lệch điểm ⚠', cls: 'bg-red-50 text-red-700 border-red-200 font-semibold animate-pulse' }
+                      : statusBadge(row);
 
                 return (
                   <div
@@ -595,6 +609,7 @@ export default function NhapDiemPage() {
                               : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200'
                           )}
                           onChange={e => handleDiemChange(row.thisinh_id, 'diem_gk1', e.target.value)}
+                          onBlur={() => handleValidateDiem(row.thisinh_id)}
                         />
                       </div>
                       <div>
@@ -612,15 +627,19 @@ export default function NhapDiemPage() {
                               : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200'
                           )}
                           onChange={e => handleDiemChange(row.thisinh_id, 'diem_gk2', e.target.value)}
+                          onBlur={() => handleValidateDiem(row.thisinh_id)}
                         />
                       </div>
                       <div>
                         <label className="block text-[10px] font-semibold text-slate-400 mb-1 uppercase">ĐTB</label>
                         <div className={cn(
-                          'w-full rounded-lg border text-center font-bold px-2 py-2.5 text-base',
-                          dtb != null ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                          'w-full rounded-lg border text-center font-bold px-2 py-2.5 text-base flex items-center justify-center gap-1',
+                          isChenhLech && row.trang_thai_nhap !== 'DaKhoa'
+                            ? 'bg-red-50 border-red-300 text-red-700 ring-1 ring-red-100'
+                            : dtb != null ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
                             : 'bg-slate-100 border-slate-200 text-slate-400'
                         )}>
+                          {isChenhLech && row.trang_thai_nhap !== 'DaKhoa' && <AlertTriangle size={16} className="text-red-500 shrink-0" />}
                           {dtb != null ? dtb.toFixed(2) : '—'}
                         </div>
                       </div>
@@ -700,11 +719,14 @@ export default function NhapDiemPage() {
                 const isSaving = savingIds.has(row.thisinh_id);
                 const isSaved = savedIds.has(row.thisinh_id);
                 const dtb = calcDTB(row.diem_gk1, row.diem_gk2);
+                const isChenhLech = row.diem_gk1 != null && row.diem_gk2 != null && Math.abs(row.diem_gk1 - row.diem_gk2) > 15;
                 const badge = isSaving
                   ? { label: 'Đang lưu...', cls: 'bg-amber-50 text-amber-600 border-amber-200' }
                   : isSaved
                     ? { label: 'Đã lưu ✓', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
-                    : statusBadge(row);
+                    : isChenhLech && row.trang_thai_nhap !== 'DaKhoa'
+                      ? { label: 'Lệch điểm ⚠', cls: 'bg-red-50 text-red-700 border-red-200 font-semibold animate-pulse' }
+                      : statusBadge(row);
 
                 return (
                   <div
@@ -735,6 +757,7 @@ export default function NhapDiemPage() {
                             : isSaving ? 'bg-amber-50 border-amber-300 text-slate-800'
                             : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200')}
                         onChange={e => handleDiemChange(row.thisinh_id, 'diem_gk1', e.target.value)}
+                        onBlur={() => handleValidateDiem(row.thisinh_id)}
                       />
                     </div>
                     <div className="px-3 py-2.5 flex items-center">
@@ -745,12 +768,16 @@ export default function NhapDiemPage() {
                             : isSaving ? 'bg-amber-50 border-amber-300 text-slate-800'
                             : 'bg-white border-slate-200 text-slate-800 focus:border-brand-400 focus:ring-1 focus:ring-brand-200')}
                         onChange={e => handleDiemChange(row.thisinh_id, 'diem_gk2', e.target.value)}
+                        onBlur={() => handleValidateDiem(row.thisinh_id)}
                       />
                     </div>
                     <div className="px-3 py-2.5 flex items-center">
-                      <div className={cn('w-full rounded-lg border text-center text-sm font-bold px-2 py-1.5',
-                        dtb != null ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                      <div className={cn('w-full rounded-lg border text-center text-sm font-bold px-2 py-1.5 flex items-center justify-center gap-1',
+                        isChenhLech && row.trang_thai_nhap !== 'DaKhoa'
+                          ? 'bg-red-50 border-red-300 text-red-700 ring-1 ring-red-100'
+                          : dtb != null ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
                           : 'bg-slate-100 border-slate-200 text-slate-400')}>
+                        {isChenhLech && row.trang_thai_nhap !== 'DaKhoa' && <AlertTriangle size={14} className="text-red-500 shrink-0" />}
                         {dtb != null ? dtb.toFixed(2) : '—'}
                       </div>
                     </div>
