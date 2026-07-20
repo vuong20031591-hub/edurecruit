@@ -32,12 +32,13 @@ export async function POST(req: NextRequest) {
       result: 'SUCCESS',
     });
 
+    const totalProcessed = result.trung_tuyen_count + result.du_phong_count + result.khong_dat_count;
     notify({
       userId,
       loai: 'XetTuyen',
       tieuDe: `Xét tuyển hoàn tất kỳ #${ky_tuyendung_id}`,
-      noiDung: `Đã xử lý ${(result as { total?: number }).total ?? 0} hồ sơ`,
-      lienKet: '/dashboard/ket-qua',
+      noiDung: `Đã xử lý ${totalProcessed} hồ sơ (${result.trung_tuyen_count} trúng tuyển, ${result.du_phong_count} dự phòng, ${result.khong_dat_count} không đạt)`,
+      lienKet: '/dashboard/xet-tuyen',
     });
 
     return json(result);

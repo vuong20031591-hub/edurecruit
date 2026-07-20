@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
     })();
 
     const userId = Number(session.sub);
-    notify({ userId, loai: 'ChiTieu', tieuDe: `Import chỉ tiêu hoàn tất (${parsed.length} đơn vị)`, lienKet: '/dashboard/chi-tieu' });
+    notify({ userId, loai: 'ChiTieu', tieuDe: `Import chỉ tiêu hoàn tất (${parsed.length} đơn vị)`, lienKet: '/dashboard/chi-tieu/import' });
 
     return json({
       imported: parsed.length,
